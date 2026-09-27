@@ -33,6 +33,8 @@ pub struct WorkoutRequest {
     pub title: String,
     pub notes: Option<String>,
     pub routine_id: Option<Uuid>,
+    #[serde(default, deserialize_with = "crate::extract::double_option")]
+    pub place_version_id: Option<Option<Uuid>>,
     pub started_at: DateTime<Utc>,
     pub ended_at: Option<DateTime<Utc>>,
     /// Client-side edit counter; writes older than the stored revision are rejected.
@@ -192,6 +194,7 @@ pub fn validate_set_values(
 pub struct Workout {
     pub id: Uuid,
     pub routine_id: Option<Uuid>,
+    pub place: Option<sqlx::types::Json<crate::places::model::Place>>,
     pub title: String,
     pub notes: Option<String>,
     pub started_at: DateTime<Utc>,
@@ -233,6 +236,7 @@ pub struct WorkoutSet {
 pub struct WorkoutSummary {
     pub id: Uuid,
     pub routine_id: Option<Uuid>,
+    pub place: Option<sqlx::types::Json<crate::places::model::Place>>,
     pub title: String,
     pub started_at: DateTime<Utc>,
     pub ended_at: Option<DateTime<Utc>>,
