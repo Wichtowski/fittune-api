@@ -10,7 +10,7 @@ async fn places_are_private_validated_versioned_and_archivable(pool: PgPool) {
     let owner = app.register("placeowner").await;
     let other = app.register("placeother").await;
     let uri = format!("/api/v1/places/{}", uuid());
-    let input = json!({"name": " Home ", "kind": "home", "equipment": ["dumbbell", "dumbbell"]});
+    let input = json!({"name": " Home ", "kind": "home", "equipment": ["dumbbells", "dumbbells"]});
     assert_eq!(
         app.request(Method::GET, "/api/v1/places", None, None)
             .await
@@ -20,8 +20,8 @@ async fn places_are_private_validated_versioned_and_archivable(pool: PgPool) {
     let (status, home) = app.put(&uri, &owner.token, input).await;
     assert_eq!(status, StatusCode::CREATED, "{home}");
     assert_eq!(home["name"], "Home");
-    assert_eq!(home["equipment"], json!(["dumbbell"]));
-    let same = json!({"name": "Home", "kind": "home", "equipment": ["dumbbell"]});
+    assert_eq!(home["equipment"], json!(["dumbbells"]));
+    let same = json!({"name": "Home", "kind": "home", "equipment": ["dumbbells"]});
     assert_eq!(
         app.put(&uri, &owner.token, same.clone()).await.1["version_id"],
         home["version_id"]
@@ -50,7 +50,7 @@ async fn places_are_private_validated_versioned_and_archivable(pool: PgPool) {
         ),
         (
             json!({"name": "Home", "kind": "home", "equipment": ["none"]}),
-            StatusCode::UNPROCESSABLE_ENTITY,
+            StatusCode::BAD_REQUEST,
         ),
         (
             json!({"name": "Home", "kind": "home", "equipment": [], "user_id": other.id}),
@@ -96,7 +96,7 @@ async fn offline_workouts_keep_owned_place_versions_after_edit_and_archive(pool:
         .put(
             &place_uri,
             &owner.token,
-            json!({"name": "Home", "kind": "home", "equipment": ["band"]}),
+            json!({"name": "Home", "kind": "home", "equipment": ["resistance_band"]}),
         )
         .await;
     let workout_uri = format!("/api/v1/workouts/{}", uuid());
@@ -168,15 +168,15 @@ async fn equipment_order_does_not_create_new_versions(pool: PgPool) {
         .put(
             &uri,
             &owner.token,
-            json!({"name": "Home", "kind": "home", "equipment": ["band", "dumbbell"]}),
+            json!({"name": "Home", "kind": "home", "equipment": ["resistance_band", "dumbbells"]}),
         )
         .await;
-    assert_eq!(first["equipment"], json!(["dumbbell", "band"]));
+    assert_eq!(first["equipment"], json!(["dumbbells", "resistance_band"]));
     let (status, reordered) = app
         .put(
             &uri,
             &owner.token,
-            json!({"name": "Home", "kind": "home", "equipment": ["dumbbell", "band", "band"]}),
+            json!({"name": "Home", "kind": "home", "equipment": ["dumbbells", "resistance_band", "resistance_band"]}),
         )
         .await;
     assert_eq!(status, StatusCode::OK);
@@ -221,4 +221,48 @@ async fn users_keep_at_most_ten_active_places(pool: PgPool) {
         app.put(&fresh, &owner.token, place(10)).await.0,
         StatusCode::CREATED
     );
+}
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn places_accept_every_equipment_item(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let owner = app.register("fullgym").await;
+    let all = json!([
+        "barbell",
+        "ez_bar",
+        "dumbbells",
+        "kettlebells",
+        "flat_bench",
+        "adjustable_bench",
+        "squat_rack",
+        "pull_up_bar",
+        "dip_station",
+        "leg_press",
+        "leg_extension",
+        "leg_curl",
+        "calf_raise_machine",
+        "smith_machine",
+        "chest_press_machine",
+        "pec_deck",
+        "shoulder_press_machine",
+        "assisted_pull_up_machine",
+        "cable_station",
+        "lat_pulldown",
+        "seated_row",
+        "treadmill",
+        "rowing_machine",
+        "stationary_bike",
+        "resistance_band",
+        "ab_wheel",
+        "jump_rope"
+    ]);
+    let (status, place) = app
+        .put(
+            &format!("/api/v1/places/{}", uuid()),
+            &owner.token,
+            json!({"name": "Full gym", "kind": "gym", "equipment": all}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{place}");
+    assert_eq!(place["equipment"], all);
 }

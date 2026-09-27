@@ -96,14 +96,26 @@ ExerciseInput {
   "tracking": "weight_reps" | "reps" | "duration" | "distance_duration",
   "primary_muscle": Muscle, "secondary_muscles": [Muscle],
   "equipment": "none" | "barbell" | "dumbbell" | "kettlebell" | "machine" | "cable" | "band" | "plate" | "other",
+  "requires": [EquipmentItem],                // everything the exercise needs; [] for bodyweight
   "difficulty": "beginner" | "intermediate" | "advanced",
   "video_id": "dQw4w9WgXcQ" | null,           // YouTube id
   "instructions": "…" | null
 }
+EquipmentItem = "barbell" | "ez_bar" | "dumbbells" | "kettlebells"
+              | "flat_bench" | "adjustable_bench" | "squat_rack" | "pull_up_bar" | "dip_station"
+              | "leg_press" | "leg_extension" | "leg_curl" | "calf_raise_machine" | "smith_machine"
+              | "chest_press_machine" | "pec_deck" | "shoulder_press_machine" | "assisted_pull_up_machine"
+              | "cable_station" | "lat_pulldown" | "seated_row"
+              | "treadmill" | "rowing_machine" | "stationary_bike"
+              | "resistance_band" | "ab_wheel" | "jump_rope"
 Muscle = "chest" | "lats" | "upper_back" | "lower_back" | "traps" | "shoulders" | "biceps" | "triceps"
        | "forearms" | "abs" | "quadriceps" | "hamstrings" | "glutes" | "calves" | "full_body" | "cardio"
 Exercise = ExerciseInput + { id, is_custom, archived_at, created_at, updated_at }
 ```
+
+`equipment` is a display category used for badges and the `equipment=` filter.
+`requires` is what matches exercises to places: an exercise can be done at a place when every item it requires is in the place's `equipment`.
+`requires` is deduplicated and stored in the order `EquipmentItem` is listed above; `PUT` replaces it like every other field.
 
 `ExerciseHistory`:
 
@@ -132,7 +144,7 @@ metrics or records.
 
 ## Workout places
 
-Places belong to the authenticated user and contain equipment categories from the exercise catalog.
+Places belong to the authenticated user and list the `EquipmentItem`s available there.
 Home and Gym suggestions are editable client presets; `custom` supports any named setup, and users may have multiple places of the same type.
 
 | Method | Path | Notes |
@@ -145,15 +157,14 @@ Home and Gym suggestions are editable client presets; `custom` supports any name
 PlaceInput {
   "name": "Home",
   "kind": "home" | "gym" | "custom",
-  "equipment": ["dumbbell", "band"]
+  "equipment": ["dumbbells", "adjustable_bench", "resistance_band"]
 }
 Place = PlaceInput + { "id": "uuid", "version_id": "uuid" }
 ```
 
 Names are trimmed and limited to 1-80 characters.
-Equipment accepts up to eight categories: `barbell`, `dumbbell`, `kettlebell`, `machine`, `cable`, `band`, `plate`, `other`.
-Bodyweight is always available; an empty list means bodyweight-only, and `none` is rejected.
-Duplicate equipment entries are removed and the list is stored in a fixed order.
+Equipment accepts any `EquipmentItem`s; bodyweight is always available, so an empty list means bodyweight-only.
+Duplicate equipment entries are removed and the list is stored in the `EquipmentItem` order.
 Saving changed details creates an immutable version; replaying the current values, in any order, returns the current version.
 A `PUT` to a new id creates the place; a `PUT` to an archived place or to another user's place returns `404`.
 A user can keep at most 10 active places; creating another returns `409 conflict` until one is archived.

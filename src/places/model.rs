@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
+    equipment::{self, EquipmentItem},
     error::{ApiResult, FieldErrors},
-    exercises::model::Equipment,
     validate,
 };
 
@@ -22,7 +22,7 @@ pub struct Place {
     pub version_id: Uuid,
     pub name: String,
     pub kind: PlaceKind,
-    pub equipment: Vec<Equipment>,
+    pub equipment: Vec<EquipmentItem>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -30,26 +30,15 @@ pub struct Place {
 pub struct PlaceRequest {
     pub name: String,
     pub kind: PlaceKind,
-    pub equipment: Vec<Equipment>,
+    pub equipment: Vec<EquipmentItem>,
 }
 
 impl PlaceRequest {
     pub fn validate(mut self) -> ApiResult<Self> {
         let mut errors = FieldErrors::default();
         self.name = validate::required_text(&mut errors, "name", &self.name, 1, 80);
-        errors.ensure(
-            self.equipment.len() <= 8,
-            "equipment",
-            "Choose at most 8 equipment types",
-        );
-        errors.ensure(
-            !self.equipment.contains(&Equipment::None),
-            "equipment",
-            "Bodyweight is always available; use an empty list for no equipment",
-        );
         // Canonical order, so reordering the same equipment does not create a new version
-        self.equipment.sort();
-        self.equipment.dedup();
+        self.equipment = equipment::canonical(self.equipment);
         errors.into_result()?;
         Ok(self)
     }
