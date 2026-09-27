@@ -172,3 +172,45 @@ async fn only_admins_manage_the_catalog(pool: PgPool) {
         "catalog additions are visible to everyone"
     );
 }
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn exercises_list_the_equipment_they_require(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let user = app.register("gearuser").await;
+    for (name, requires) in [
+        (
+            "Barbell Bench Press",
+            json!(["barbell", "flat_bench", "squat_rack"]),
+        ),
+        ("Pull-Up", json!(["pull_up_bar"])),
+        ("Leg Press", json!(["leg_press"])),
+        ("Push-Up", json!([])),
+    ] {
+        let id = app.catalog_exercise(name).await;
+        let (_, exercise) = app
+            .get(&format!("/api/v1/exercises/{id}"), &user.token)
+            .await;
+        assert_eq!(exercise["requires"], requires, "{name}");
+    }
+
+    let (status, created) = app
+        .post(
+            "/api/v1/exercises",
+            Some(&user.token),
+            json!({ "name": "Landmine Row", "tracking": "weight_reps", "primary_muscle": "upper_back",
+                    "equipment": "barbell", "requires": ["squat_rack", "barbell", "barbell"] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    assert_eq!(created["requires"], json!(["barbell", "squat_rack"]));
+
+    let (status, _) = app
+        .post(
+            "/api/v1/exercises",
+            Some(&user.token),
+            json!({ "name": "Mystery Move", "tracking": "reps", "primary_muscle": "abs",
+                    "requires": ["hoverboard"] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}

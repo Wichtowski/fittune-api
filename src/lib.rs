@@ -5,6 +5,7 @@ pub mod app;
 pub mod auth;
 pub mod config;
 pub mod db;
+pub mod equipment;
 pub mod error;
 pub mod exercises;
 mod extract;
