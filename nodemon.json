@@ -1,6 +1,0 @@
-{
-    "watch": ["src"],
-    "ext": "ts",
-    "ignore": ["build"],
-    "exec": "npx tsc && clear && npx ts-node ./dist/index.js"
-}

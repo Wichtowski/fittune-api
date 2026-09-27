@@ -1,0 +1,99 @@
+name: Deploy Backend
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-backend-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      DEPLOY_ARCHIVE: ${{ vars.DEPLOY_ARCHIVE }}
+      RELEASE_VERSION: ${{ github.ref_name }}
+
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+
+      - name: Package repository
+        run: |
+          rm -f "${DEPLOY_ARCHIVE}" "${RUNNER_TEMP}/${DEPLOY_ARCHIVE}"
+
+          tar \
+            --exclude=.git \
+            --exclude=.github \
+            --exclude=target \
+            --exclude=.env \
+            --exclude=.env.* \
+            -czf "${RUNNER_TEMP}/${DEPLOY_ARCHIVE}" .
+
+          cp "${RUNNER_TEMP}/${DEPLOY_ARCHIVE}" "${DEPLOY_ARCHIVE}"
+
+      - name: Build production env file
+        run: |
+          cat > .env.production <<'ENVEOF'
+          ${{ secrets.ENV_PRODUCTION }}
+          ENVEOF
+
+          sed -i '/^FITTUNE_APP_VERSION=/d' .env.production
+          printf '\nFITTUNE_APP_VERSION=%s\n' "${RELEASE_VERSION}" >> .env.production
+
+      - name: Copy release files to VPS
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
+          source: "${{ env.DEPLOY_ARCHIVE }},.env.production"
+          target: /tmp
+
+      - name: Deploy stack on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
+          script_stop: true
+          envs: DEPLOY_PATH,DEPLOY_ARCHIVE
+          command_timeout: "30m"
+          script: |
+            set -euo pipefail
+
+            mkdir -p "${DEPLOY_PATH}"
+            cd "${DEPLOY_PATH}"
+
+            # Stop existing containers if running. Named volumes (the Postgres data) are kept.
+            if [ -f docker-compose.prod.yml ] && [ -f .env ]; then
+              docker compose --env-file .env -f docker-compose.prod.yml down || true
+            fi
+
+            # Clean up the previous release except .env
+            find . -mindepth 1 -maxdepth 1 ! -name '.env' -exec rm -rf {} +
+
+            mv /tmp/.env.production "${DEPLOY_PATH}/.env"
+            chmod 600 "${DEPLOY_PATH}/.env"
+
+            # Extract the codebase. Use --no-overwrite-dir to avoid metadata modification/utime errors on existing directories
+            tar -xzf "/tmp/${DEPLOY_ARCHIVE}" --no-overwrite-dir -C "${DEPLOY_PATH}"
+            rm -f "/tmp/${DEPLOY_ARCHIVE}"
+
+            # Build the Rust image on the VPS and start the stack; migrations run on API start-up.
+            docker compose --env-file .env -f docker-compose.prod.yml up -d --build --wait --wait-timeout 180
+            docker compose --env-file .env -f docker-compose.prod.yml ps
+
+            # Drop superseded image layers so repeated Rust builds do not fill the disk.
+            docker image prune -f

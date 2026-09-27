@@ -1,0 +1,55 @@
+name: Backend Control
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do?
+        required: true
+        type: choice
+        options:
+          - start
+          - stop
+          - restart
+
+permissions:
+  contents: read
+
+jobs:
+  backend-control:
+    name: Backend Control — ${{ github.event.inputs.action }}
+    runs-on: ubuntu-latest
+
+    env:
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      ACTION: ${{ github.event.inputs.action }}
+
+    steps:
+      - name: Control backend on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
+          script_stop: true
+          command_timeout: 10m
+          envs: DEPLOY_PATH,ACTION
+          script: |
+            set -euo pipefail
+
+            cd "${DEPLOY_PATH}"
+
+            # Postgres keeps running on stop/restart; only the API container is controlled.
+            if [ "${ACTION}" = "start" ]; then
+              docker compose --env-file .env -f docker-compose.prod.yml up -d fittune-api
+            elif [ "${ACTION}" = "stop" ]; then
+              docker compose --env-file .env -f docker-compose.prod.yml stop fittune-api
+            elif [ "${ACTION}" = "restart" ]; then
+              docker compose --env-file .env -f docker-compose.prod.yml restart fittune-api
+            else
+              echo "Unknown action: ${ACTION}"
+              exit 1
+            fi
+
+            docker compose --env-file .env -f docker-compose.prod.yml ps
