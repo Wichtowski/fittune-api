@@ -14,6 +14,7 @@ use crate::{
     exercises,
     extract::{Json, Path, Query},
     pagination::{self, Page},
+    places,
 };
 
 pub fn router() -> Router<AppState> {
@@ -76,6 +77,14 @@ async fn put(
     }
 
     let mut tx = state.db.begin().await?;
+    if let Some(Some(version_id)) = draft.place_version_id
+        && !places::repo::owns_version(&mut tx, auth.user_id(), version_id).await?
+    {
+        return Err(ApiError::validation(
+            "place_version_id",
+            "Workout references an unknown place",
+        ));
+    }
     let outcome = repo::upsert(&mut tx, auth.user_id(), id, &draft)
         .await
         .map_err(|err| match unique_violation(&err) {

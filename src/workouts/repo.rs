@@ -25,10 +25,11 @@ pub async fn upsert(
     draft: &WorkoutDraft,
 ) -> sqlx::Result<UpsertOutcome> {
     let inserted: Option<bool> = sqlx::query_scalar(
-        "INSERT INTO workouts (id, user_id, routine_id, title, notes, started_at, ended_at, revision)
-         VALUES ($1, $2, (SELECT id FROM routines WHERE id = $3 AND user_id = $2), $4, $5, $6, $7, $8)
+        "INSERT INTO workouts (id, user_id, routine_id, title, notes, started_at, ended_at, revision, place_version_id)
+         VALUES ($1, $2, (SELECT id FROM routines WHERE id = $3 AND user_id = $2), $4, $5, $6, $7, $8, $9)
          ON CONFLICT (id) DO UPDATE SET
             routine_id = EXCLUDED.routine_id,
+            place_version_id = CASE WHEN $10 THEN EXCLUDED.place_version_id ELSE workouts.place_version_id END,
             title = EXCLUDED.title,
             notes = EXCLUDED.notes,
             started_at = EXCLUDED.started_at,
@@ -46,6 +47,8 @@ pub async fn upsert(
     .bind(draft.started_at)
     .bind(draft.ended_at)
     .bind(draft.revision)
+    .bind(draft.place_version_id.flatten())
+    .bind(draft.place_version_id.is_some())
     .fetch_optional(&mut **tx)
     .await?;
 
@@ -170,6 +173,7 @@ struct SetColumns {
 struct WorkoutRow {
     id: Uuid,
     routine_id: Option<Uuid>,
+    place: Option<sqlx::types::Json<crate::places::model::Place>>,
     title: String,
     notes: Option<String>,
     started_at: DateTime<Utc>,
@@ -196,8 +200,10 @@ pub async fn find(
     id: Uuid,
 ) -> sqlx::Result<Option<Workout>> {
     let Some(row): Option<WorkoutRow> = sqlx::query_as(
-        "SELECT id, routine_id, title, notes, started_at, ended_at, revision, created_at, updated_at
-         FROM workouts WHERE id = $1 AND user_id = $2",
+        "SELECT w.id, w.routine_id, w.title, w.notes, w.started_at, w.ended_at, w.revision, w.created_at, w.updated_at,
+                to_jsonb(v) AS place
+         FROM workouts w LEFT JOIN workout_place_versions v ON v.version_id = w.place_version_id
+         WHERE w.id = $1 AND w.user_id = $2",
     )
     .bind(id)
     .bind(user_id)
@@ -254,6 +260,7 @@ pub async fn find(
     Ok(Some(Workout {
         id: row.id,
         routine_id: row.routine_id,
+        place: row.place,
         title: row.title,
         notes: row.notes,
         started_at: row.started_at,
@@ -286,7 +293,7 @@ pub async fn list(
 ) -> sqlx::Result<Vec<WorkoutSummary>> {
     let (before_at, before_id) = params.before.unzip();
     sqlx::query_as(
-        "SELECT w.id, w.routine_id, w.title, w.started_at, w.ended_at,
+        "SELECT w.id, w.routine_id, w.title, w.started_at, w.ended_at, to_jsonb(pv) AS place,
                 EXTRACT(EPOCH FROM (w.ended_at - w.started_at))::bigint AS duration_seconds,
                 COALESCE(agg.exercise_count, 0) AS exercise_count,
                 COALESCE(agg.set_count, 0) AS set_count,
@@ -294,6 +301,7 @@ pub async fn list(
                 COALESCE(agg.volume_kg, 0) AS volume_kg,
                 COALESCE(agg.exercise_names, '{}') AS exercise_names
          FROM workouts w
+         LEFT JOIN workout_place_versions pv ON pv.version_id = w.place_version_id
          LEFT JOIN LATERAL (
              SELECT count(DISTINCT we.id) AS exercise_count,
                     count(ws.id) FILTER (WHERE ws.completed AND ws.kind <> 'warmup') AS set_count,
