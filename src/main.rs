@@ -135,7 +135,7 @@ fn healthcheck() -> Result<()> {
     let port = std::env::var("FITTUNE_BIND_ADDR")
         .ok()
         .and_then(|addr| addr.parse::<SocketAddr>().ok())
-        .map_or(8080, |addr| addr.port());
+        .map_or(4733, |addr| addr.port());
     let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
 
     let mut stream =

@@ -21,7 +21,7 @@ services:
     build:
       context: .
     ports:
-      - "${FITTUNE_API_PORT:-8080}:8080"
+      - "${FITTUNE_API_PORT:-4733}:4733"
     environment:
       FITTUNE_DATABASE_URL: postgres://fittune:fittune@fittune-postgres:5432/fittune
       FITTUNE_CORS_ORIGINS: ${FITTUNE_CORS_ORIGINS:-http://localhost:5173}

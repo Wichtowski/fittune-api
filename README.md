@@ -41,7 +41,7 @@ Prerequisites: Rust 1.94 (pinned in `rust-toolchain.toml`) and Docker Compose (o
 ```bash
 cp .env.example .env
 make up        # Postgres on localhost:5432
-make run       # API on http://localhost:8080, applies migrations
+make run       # API on http://localhost:4733, applies migrations
 ```
 
 ```bash
@@ -67,7 +67,7 @@ docker compose --env-file .env -f docker-compose.prod.yml \
 |----------|---------|---------|
 | `FITTUNE_DATABASE_URL` | — (required) | Postgres connection string |
 | `FITTUNE_DB_MAX_CONNECTIONS` | `10` | Pool size |
-| `FITTUNE_BIND_ADDR` | `0.0.0.0:8080` | Listen address |
+| `FITTUNE_BIND_ADDR` | `0.0.0.0:4733` | Listen address |
 | `FITTUNE_CORS_ORIGINS` | `http://localhost:5173` | Comma-separated allowed browser origins |
 | `FITTUNE_SESSION_TTL_HOURS` | `720` | Idle lifetime of a session |
 | `FITTUNE_LOG_FORMAT` | `pretty` | `pretty` or `json` |
@@ -79,9 +79,10 @@ docker compose --env-file .env -f docker-compose.prod.yml \
 Deployment follows the EchoTrade VPS pattern: the static frontend is deployed separately, and this
 repository ships a Docker Compose stack to the VPS over SSH.
 
-- `apifittune.oskarwichtowski.com` → `fittune-api:8080`, routed by the global platform edge
-- Nothing in this stack publishes host ports. `fittune-api` sits on `app_net` (reachable by the
-  edge); Postgres is only on the internal `data_net`.
+- `api-fittune.oskarwichtowski.com` → `fittune-api:4733`, routed by the global platform edge
+- Nothing in this stack publishes host ports. `fittune-api` sits on the external `fittune_edge_net`
+  (shared with the platform-edge Caddy, create it once with `docker network create fittune_edge_net`);
+  Postgres is only on the internal `data_net`.
 - Postgres data lives in the named `pgdata` volume and survives redeploys.
 
 GitHub Actions:
