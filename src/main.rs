@@ -1,23 +1,26 @@
 use std::{
     io::{Read, Write},
     net::{Ipv4Addr, SocketAddr, TcpStream},
-    sync::Arc,
     time::Duration,
 };
 
 use anyhow::{Context, Result, bail};
 use fittune_api::{
     AppState,
-    auth::session,
+    auth::{
+        session,
+        signup::{self, NewUser},
+    },
     config::{Config, LogFormat},
-    db, router,
+    db,
+    error::ApiError,
+    router,
     users::{self, model::Role},
 };
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
-const USAGE: &str =
-    "usage: fittune-api [serve | migrate | healthcheck | grant-admin <username-or-email>]";
+const USAGE: &str = "usage: fittune-api [serve | migrate | healthcheck | create-admin <username> <email> | grant-admin <username-or-email>]";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -39,6 +42,7 @@ async fn main() -> Result<()> {
             db::migrate(&pool).await
         }
         ["healthcheck"] => healthcheck(),
+        ["create-admin", username, email] => create_admin(username, email).await,
         ["grant-admin", login] => grant_admin(login).await,
         _ => bail!("{USAGE}"),
     }
@@ -56,14 +60,15 @@ async fn serve(config: Config) -> Result<()> {
         .with_context(|| format!("failed to bind {}", config.bind_addr))?;
     tracing::info!(addr = %config.bind_addr, version = %config.app_version, "fittune-api listening");
 
-    let app = router(AppState {
-        db: pool.clone(),
-        config: Arc::new(config),
-    });
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-        .context("server error")?;
+    let app = router(AppState::new(pool.clone(), config));
+    // Connection info gives rate limiting a client address when no proxy header is configured
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await
+    .context("server error")?;
 
     pool.close().await;
     tracing::info!("fittune-api stopped");
@@ -150,6 +155,54 @@ fn healthcheck() -> Result<()> {
         Ok(())
     } else {
         bail!("unhealthy: {status_line}")
+    }
+}
+
+/// Operator bootstrap for a closed installation: creates an admin with the same validation and
+/// hashing as registration. The password is read from the terminal without echo (or from stdin
+/// when piped), so it never appears in shell history, process lists or logs
+async fn create_admin(username: &str, email: &str) -> Result<()> {
+    let password = read_new_password()?;
+    let user = match NewUser::validate(username, email, password, None, None) {
+        Ok(user) => user,
+        Err(err) => bail!("{}", describe(err)),
+    };
+
+    let config = Config::from_env()?;
+    let pool = db::connect(&config.database_url, 1).await?;
+    db::migrate(&pool).await?;
+    let mut tx = pool.begin().await?;
+    let id = match signup::create(&mut tx, user, Role::Admin, None).await {
+        Ok(id) => id,
+        Err(err) => bail!("{}", describe(err)),
+    };
+    tx.commit().await?;
+    println!("created admin {username} ({id})");
+    Ok(())
+}
+
+fn read_new_password() -> Result<String> {
+    if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
+        let password = rpassword::prompt_password("Password: ")?;
+        if rpassword::prompt_password("Repeat password: ")? != password {
+            bail!("passwords do not match");
+        }
+        Ok(password)
+    } else {
+        let mut line = String::new();
+        std::io::stdin().read_line(&mut line)?;
+        Ok(line.trim_end_matches(['\r', '\n']).to_owned())
+    }
+}
+
+fn describe(err: ApiError) -> String {
+    match err {
+        ApiError::Validation { fields, .. } => fields
+            .into_iter()
+            .map(|(field, message)| format!("{field}: {message}"))
+            .collect::<Vec<_>>()
+            .join("; "),
+        other => other.to_string(),
     }
 }
 

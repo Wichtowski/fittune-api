@@ -5,6 +5,7 @@ mod activities;
 mod auth;
 mod common;
 mod exercises;
+mod invites;
 mod places;
 mod routines;
 mod stats;
