@@ -7,7 +7,7 @@ use crate::workouts::model::SetKind;
 
 macro_rules! exercise_columns {
     () => {
-        "id, owner_id, name, tracking, primary_muscle, secondary_muscles, equipment, difficulty, \
+        "id, owner_id, name, tracking, primary_muscle, secondary_muscles, equipment, requires, difficulty, \
          video_id, instructions, owner_id IS NOT NULL AS is_custom, archived_at, created_at, updated_at"
     };
 }
@@ -90,8 +90,8 @@ pub async fn insert(
 ) -> sqlx::Result<Exercise> {
     sqlx::query_as(concat!(
         "INSERT INTO exercises (id, owner_id, name, tracking, primary_muscle, secondary_muscles,
-                                equipment, difficulty, video_id, instructions)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                                equipment, requires, difficulty, video_id, instructions)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING ",
         exercise_columns!()
     ))
@@ -102,6 +102,7 @@ pub async fn insert(
     .bind(draft.primary_muscle)
     .bind(&draft.secondary_muscles)
     .bind(draft.equipment)
+    .bind(&draft.requires)
     .bind(draft.difficulty)
     .bind(&draft.video_id)
     .bind(&draft.instructions)
@@ -112,7 +113,8 @@ pub async fn insert(
 pub async fn update(db: &PgPool, id: Uuid, draft: &ExerciseDraft) -> sqlx::Result<Exercise> {
     sqlx::query_as(concat!(
         "UPDATE exercises SET name = $2, tracking = $3, primary_muscle = $4, secondary_muscles = $5,
-                equipment = $6, difficulty = $7, video_id = $8, instructions = $9, updated_at = now()
+                equipment = $6, requires = $7, difficulty = $8, video_id = $9, instructions = $10,
+                updated_at = now()
          WHERE id = $1
          RETURNING ",
         exercise_columns!()
@@ -123,6 +125,7 @@ pub async fn update(db: &PgPool, id: Uuid, draft: &ExerciseDraft) -> sqlx::Resul
     .bind(draft.primary_muscle)
     .bind(&draft.secondary_muscles)
     .bind(draft.equipment)
+    .bind(&draft.requires)
     .bind(draft.difficulty)
     .bind(&draft.video_id)
     .bind(&draft.instructions)

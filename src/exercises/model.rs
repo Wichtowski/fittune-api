@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
+    equipment::{self, EquipmentItem},
     error::{ApiResult, FieldErrors},
     validate,
 };
@@ -76,6 +77,8 @@ pub struct Exercise {
     pub primary_muscle: Muscle,
     pub secondary_muscles: Vec<Muscle>,
     pub equipment: Equipment,
+    /// Every equipment item the exercise needs; empty for bodyweight exercises
+    pub requires: Vec<EquipmentItem>,
     pub difficulty: Difficulty,
     /// YouTube video id demonstrating the movement.
     pub video_id: Option<String>,
@@ -96,6 +99,8 @@ pub struct ExerciseRequest {
     pub secondary_muscles: Vec<Muscle>,
     #[serde(default = "default_equipment")]
     pub equipment: Equipment,
+    #[serde(default)]
+    pub requires: Vec<EquipmentItem>,
     #[serde(default = "default_difficulty")]
     pub difficulty: Difficulty,
     pub video_id: Option<String>,
@@ -121,6 +126,7 @@ pub struct ExerciseDraft {
     pub primary_muscle: Muscle,
     pub secondary_muscles: Vec<Muscle>,
     pub equipment: Equipment,
+    pub requires: Vec<EquipmentItem>,
     pub difficulty: Difficulty,
     pub video_id: Option<String>,
     pub instructions: Option<String>,
@@ -163,6 +169,7 @@ impl ExerciseRequest {
             primary_muscle: self.primary_muscle,
             secondary_muscles,
             equipment: self.equipment,
+            requires: equipment::canonical(self.requires),
             difficulty: self.difficulty,
             video_id,
             instructions,
