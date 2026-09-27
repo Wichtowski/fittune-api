@@ -1,0 +1,63 @@
+name: Create Release Tag
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version part to bump
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+concurrency:
+  group: create-release-tag-main
+  cancel-in-progress: false
+
+jobs:
+  create_tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Validate manual release branch
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$RELEASE_REF" != "refs/heads/main" ]]; then
+            echo "::error::Manual release tags must be created from main. Selected ref: $RELEASE_REF"
+            exit 1
+          fi
+
+      - name: Bump version and push tag
+        id: tag
+        uses: anothrNick/github-tag-action@1.75.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BUMP: ${{ github.event.inputs.bump || 'patch' }}
+          INITIAL_VERSION: 0.0.0
+          TAG_PREFIX: ""
+          RELEASE_BRANCHES: main
+          DEFAULT_BRANCH: main
+          FORCE_WITHOUT_CHANGES: ${{ github.event_name == 'workflow_dispatch' }}
+          VERBOSE: false
+
+      - name: Write summary
+        run: |
+          echo "Created release tag: \`${{ steps.tag.outputs.new_tag }}\`" >> "$GITHUB_STEP_SUMMARY"
