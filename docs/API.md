@@ -1,6 +1,6 @@
 # FitTune API v1
 
-Base URL: `https://apifittune.oskarwichtowski.com` in production, `http://localhost:8080` locally.
+Base URL: `https://api-fittune.oskarwichtowski.com` in production, `http://localhost:4733` locally.
 All endpoints except `/health` and `/api/v1/auth/{register,login}` require
 `Authorization: Bearer <token>`.
 

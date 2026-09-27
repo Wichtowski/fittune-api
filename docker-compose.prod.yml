@@ -34,14 +34,14 @@ services:
     environment:
       # Derived from the Postgres credentials so they are defined once; keep the password URL-safe.
       FITTUNE_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@fittune-postgres:5432/${POSTGRES_DB}
-      FITTUNE_BIND_ADDR: 0.0.0.0:8080
+      FITTUNE_BIND_ADDR: 0.0.0.0:4733
       FITTUNE_LOG_FORMAT: json
     command: ["serve"]
     depends_on:
       fittune-postgres:
         condition: service_healthy
     expose:
-      - "8080"
+      - "4733"
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -50,7 +50,7 @@ services:
     tmpfs:
       - /tmp
     networks:
-      - app_net
+      - fittune_edge_net
       - data_net
     mem_limit: 256m
     cpus: "1.0"
@@ -66,6 +66,8 @@ volumes:
   pgdata:
 
 networks:
-  app_net:
+  # Created once on the VPS and shared with the platform-edge Caddy
+  fittune_edge_net:
+    external: true
   data_net:
     internal: true

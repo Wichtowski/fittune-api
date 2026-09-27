@@ -23,10 +23,10 @@ FROM gcr.io/distroless/cc-debian13:nonroot
 
 COPY --from=builder /build/target/release/fittune-api /usr/local/bin/fittune-api
 
-ENV FITTUNE_BIND_ADDR=0.0.0.0:8080 \
+ENV FITTUNE_BIND_ADDR=0.0.0.0:4733 \
     FITTUNE_LOG_FORMAT=json
 
-EXPOSE 8080
+EXPOSE 4733
 USER nonroot
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

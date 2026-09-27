@@ -25,9 +25,9 @@ impl Config {
         let database_url =
             env::var("FITTUNE_DATABASE_URL").context("FITTUNE_DATABASE_URL must be set")?;
 
-        let bind_addr = var_or("FITTUNE_BIND_ADDR", "0.0.0.0:8080")
+        let bind_addr = var_or("FITTUNE_BIND_ADDR", "0.0.0.0:4733")
             .parse()
-            .context("FITTUNE_BIND_ADDR must be a socket address such as 0.0.0.0:8080")?;
+            .context("FITTUNE_BIND_ADDR must be a socket address such as 0.0.0.0:4733")?;
 
         let db_max_connections = var_or("FITTUNE_DB_MAX_CONNECTIONS", "10")
             .parse()
