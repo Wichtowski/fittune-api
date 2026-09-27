@@ -1,0 +1,41 @@
+name: Deploy Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate_ref:
+    name: Validate selected ref
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate selected tag
+        shell: bash
+        env:
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$RELEASE_REF" != refs/tags/* ]]; then
+            echo "::error::Deploy Release must run from a release tag. Selected ref: $RELEASE_REF"
+            exit 1
+          fi
+
+          if ! [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid release tag: $RELEASE_VERSION"
+            exit 1
+          fi
+
+  deploy_backend:
+    name: Deploy backend to VPS
+    needs: validate_ref
+    uses: ./.github/workflows/deploy-backend.yml
+    secrets: inherit

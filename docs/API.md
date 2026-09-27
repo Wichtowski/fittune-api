@@ -1,0 +1,244 @@
+# FitTune API v1
+
+Base URL: `https://apifittune.oskarwichtowski.com` in production, `http://localhost:8080` locally.
+All endpoints except `/health` and `/api/v1/auth/{register,login}` require
+`Authorization: Bearer <token>`.
+
+## Conventions
+
+- JSON in and out. Timestamps are RFC 3339 UTC (`2026-09-27T17:00:00Z`), dates are `YYYY-MM-DD`.
+- Weights are always **kilograms**, distances **metres**, durations **seconds**. `weight_unit` /
+  `distance_unit` on the user are display preferences only.
+- Enum values are `snake_case` strings.
+- Ids are UUIDs. Workouts and activities use **client-generated** ids and are written with `PUT`,
+  so a request can be retried or replayed safely (e.g. after a dropped gym connection).
+- List endpoints that can grow without bound are keyset-paginated:
+  `?limit=20&cursor=<next_cursor>` → `{ "items": [...], "next_cursor": "..." | null }`.
+- Every response carries an `x-request-id` header (echoed if the client sends one).
+
+### Errors
+
+```json
+{ "code": "validation_failed", "message": "Password must contain at least one uppercase letter",
+  "fields": { "password": "Password must contain at least one uppercase letter" } }
+```
+
+| Status | `code`                | When                                                        |
+|--------|-----------------------|-------------------------------------------------------------|
+| 400    | `bad_request`         | Malformed JSON, unknown enum value, bad query/path parameter |
+| 401    | `unauthorized`        | Missing, invalid or expired token                           |
+| 401    | `invalid_credentials` | Wrong login or password                                     |
+| 403    | `forbidden`           | Authenticated but not allowed (admin-only actions)          |
+| 404    | `not_found`           | Resource does not exist **or belongs to another user**      |
+| 409    | `conflict`            | Stale workout revision, id collision                        |
+| 422    | `validation_failed`   | Semantically invalid input; `fields` maps field paths to messages (`exercises[0].sets[1].reps`) |
+| 500    | `internal_error`      | Unexpected server error (details are logged, not returned)  |
+
+## Health
+
+`GET /health` → `200 { "status": "ok", "version": "1.4.2", "database": "ok" }`, or `503` with
+`"status": "degraded"` when Postgres is unreachable.
+
+## Auth
+
+Sessions are opaque bearer tokens (not JWTs). They expire after `FITTUNE_SESSION_TTL_HOURS`
+(default 30 days) of inactivity; use extends them automatically.
+
+| Method | Path                    | Body                                                               | Response |
+|--------|-------------------------|--------------------------------------------------------------------|----------|
+| POST   | `/api/v1/auth/register` | `{ username, email, password, display_name?, birthday? }`          | `201 AuthResponse` |
+| POST   | `/api/v1/auth/login`    | `{ login, password }` — `login` is the username **or** email       | `200 AuthResponse` |
+| POST   | `/api/v1/auth/logout`   | —                                                                  | `204`, revokes the current token |
+
+`AuthResponse`: `{ "user": User, "session": { "token": "…", "expires_at": "…" } }`
+
+Registration rules: username 3–32 chars of letters, digits, `.`, `_`, `-`; valid email; password
+at least 8 characters with an uppercase letter and a special character, not containing the
+username; birthday not in the future. Username and email are unique case-insensitively.
+
+## Profile
+
+| Method | Path                  | Body | Response |
+|--------|-----------------------|------|----------|
+| GET    | `/api/v1/me`          | — | `User` |
+| PATCH  | `/api/v1/me`          | any of `display_name`, `birthday`, `account_type` (nullable), `weight_unit`, `distance_unit` | `User` |
+| POST   | `/api/v1/me/password` | `{ current_password, new_password }` | `204`; signs out all other sessions |
+| DELETE | `/api/v1/me`          | `{ password }` | `204`; deletes the account and all data |
+| GET    | `/api/v1/users?limit&offset` | — | `User[]` — **admin only** |
+
+```json
+User {
+  "id": "uuid", "username": "oskyy", "email": "oskar@example.com",
+  "display_name": "Oskar" | null, "birthday": "2002-07-02" | null,
+  "role": "user" | "admin",
+  "account_type": "gym_enthusiast" | "professional_trainer" | "nutritionist" | "psychologist" | "physical_therapist" | null,
+  "weight_unit": "kg" | "lb", "distance_unit": "km" | "mi",
+  "created_at": "…"
+}
+```
+
+## Exercises
+
+A shared catalog (seeded, admin-managed) plus each user's private custom exercises.
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET    | `/api/v1/exercises?q=&muscle=&equipment=` | Active catalog + own exercises, sorted by name. `muscle` matches primary or secondary. |
+| GET    | `/api/v1/exercises/{id}` | Also returns archived exercises (history still references them). |
+| POST   | `/api/v1/exercises` | `ExerciseInput`; `"global": true` adds to the catalog (admin only). `201` |
+| PUT    | `/api/v1/exercises/{id}` | Full replace. Owners edit custom exercises; admins edit the catalog. |
+| DELETE | `/api/v1/exercises/{id}` | Archives (hides from the library, keeps history). `204` |
+| GET    | `/api/v1/exercises/{id}/history?sessions=30` | Per-session breakdown and all-time records. |
+
+```json
+ExerciseInput {
+  "name": "Sled Push",
+  "tracking": "weight_reps" | "reps" | "duration" | "distance_duration",
+  "primary_muscle": Muscle, "secondary_muscles": [Muscle],
+  "equipment": "none" | "barbell" | "dumbbell" | "kettlebell" | "machine" | "cable" | "band" | "plate" | "other",
+  "difficulty": "beginner" | "intermediate" | "advanced",
+  "video_id": "dQw4w9WgXcQ" | null,           // YouTube id
+  "instructions": "…" | null
+}
+Muscle = "chest" | "lats" | "upper_back" | "lower_back" | "traps" | "shoulders" | "biceps" | "triceps"
+       | "forearms" | "abs" | "quadriceps" | "hamstrings" | "glutes" | "calves" | "full_body" | "cardio"
+Exercise = ExerciseInput + { id, is_custom, archived_at, created_at, updated_at }
+```
+
+`ExerciseHistory`:
+
+```json
+{
+  "exercise": Exercise,
+  "records": {
+    "max_weight_kg":          { "value": 110.0, "workout_id": "…", "achieved_at": "…" } | null,
+    "best_e1rm_kg":           Record | null,     // Epley, sets of 1–12 reps
+    "max_reps":               Record | null,
+    "best_session_volume_kg": Record | null,
+    "max_duration_seconds":   Record | null,
+    "max_distance_m":         Record | null
+  },
+  "sessions": [{
+    "workout_id": "…", "workout_title": "Push Day", "started_at": "…",
+    "sets": [{ "kind", "reps", "weight_kg", "duration_seconds", "distance_m", "rpe", "e1rm_kg" }],
+    "working_sets": 3, "total_reps": 15, "volume_kg": 1500.0,
+    "max_weight_kg": 100.0, "best_e1rm_kg": 116.7, "max_duration_seconds": null, "max_distance_m": null
+  }]
+}
+```
+
+Only completed sets in finished workouts count; warm-up sets are listed but never count towards
+metrics or records.
+
+## Workouts
+
+A workout is written as one document. The client owns the ids of the workout, its exercises and
+sets, and increments `revision` on every local edit. The server stores a write only if its
+revision is **greater than or equal to** the stored one (equal = idempotent replay); an older
+revision gets `409 conflict`. A workout is *in progress* while `ended_at` is `null`.
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET    | `/api/v1/workouts?status=in_progress\|completed&limit&cursor` | `Page<WorkoutSummary>`, newest first |
+| GET    | `/api/v1/workouts/{id}` | `Workout` |
+| PUT    | `/api/v1/workouts/{id}` | `WorkoutInput` → `201` created / `200` replaced, returns `Workout` |
+| DELETE | `/api/v1/workouts/{id}` | `204` |
+
+```json
+WorkoutInput {
+  "title": "Push Day", "notes": null,
+  "routine_id": "uuid" | null,               // silently dropped if the routine no longer exists
+  "started_at": "…", "ended_at": "…" | null,
+  "revision": 12,
+  "exercises": [{
+    "id": "uuid", "exercise_id": "uuid", "notes": null, "rest_seconds": 120,
+    "sets": [{
+      "id": "uuid", "kind": "warmup" | "normal" | "drop" | "failure",
+      "reps": 5, "weight_kg": 100.0, "duration_seconds": null, "distance_m": null,
+      "rpe": 8.0, "completed": true
+    }]
+  }]
+}
+Workout = WorkoutInput + { id, created_at, updated_at }, and each exercise adds
+          { exercise_name, tracking, primary_muscle }
+WorkoutSummary { id, routine_id, title, started_at, ended_at, duration_seconds, exercise_count,
+                 set_count, total_reps, volume_kg, exercise_names }
+```
+
+Limits: 60 exercises, 60 sets per exercise, workouts up to 24 h, reps 0–1000, weight 0–1000 kg,
+RPE 1–10. Order in the arrays is the display order.
+
+## Routines
+
+Reusable plans with per-set targets; a workout started from a routine carries its `routine_id`.
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET    | `/api/v1/routines` | `Routine[]` sorted by name |
+| GET    | `/api/v1/routines/{id}` | `Routine` |
+| POST   | `/api/v1/routines` | `RoutineInput` → `201 Routine` |
+| PUT    | `/api/v1/routines/{id}` | Full replace |
+| DELETE | `/api/v1/routines/{id}` | `204`; past workouts keep their data |
+
+```json
+RoutineInput {
+  "name": "Leg Day", "notes": null,
+  "exercises": [{ "exercise_id": "uuid", "rest_seconds": 180, "notes": null,
+                  "sets": [{ "kind": "normal", "reps": 5, "weight_kg": 120, "duration_seconds": null, "distance_m": null }] }]
+}
+Routine = RoutineInput + { id, last_performed_at, created_at, updated_at }, and each exercise adds
+          { id, exercise_name, tracking, primary_muscle }
+```
+
+## Activities
+
+Endurance sessions (Strava-style). Client-generated ids, `PUT` upsert.
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET    | `/api/v1/activities?kind=&limit&cursor` | `Page<Activity>`, newest first |
+| GET    | `/api/v1/activities/{id}` | `Activity` |
+| PUT    | `/api/v1/activities/{id}` | `ActivityInput` → `201` / `200` |
+| DELETE | `/api/v1/activities/{id}` | `204` |
+
+```json
+ActivityInput {
+  "kind": "run" | "ride" | "walk" | "hike" | "swim" | "row" | "other",
+  "title": "Easy run", "notes": null, "started_at": "…",
+  "duration_seconds": 1800, "distance_m": 5000.0, "elevation_gain_m": null,
+  "avg_heart_rate": 145, "calories": null, "perceived_effort": 4     // 1–10
+}
+Activity = ActivityInput + { id, created_at, updated_at }
+```
+
+## Stats
+
+Period endpoints take `from` and `to` (inclusive dates) and `tz` (IANA name, default `UTC`) so
+days and weeks follow the user's local calendar. Weeks start on Monday. Periods are capped at
+three years.
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/api/v1/stats/overview?from&to&tz` | `{ from, to, current: Totals, previous: Totals, streak_weeks }` — `previous` is the equally long period right before `from` |
+| GET | `/api/v1/stats/timeline?from&to&tz&bucket=week\|month` | `[{ bucket: "2026-09-14", ...Totals }]`, zero-filled |
+| GET | `/api/v1/stats/muscles?from&to&tz` | `[{ muscle, sets, volume_kg }]` by primary muscle |
+| GET | `/api/v1/stats/records` | `[{ exercise_id, exercise_name, tracking, primary_muscle, max_weight_kg, best_e1rm_kg, max_reps, max_duration_seconds, max_distance_m, sessions, last_performed_at }]` |
+
+```json
+Totals { "workouts": 3, "workout_seconds": 11700, "sets": 42, "reps": 380, "volume_kg": 18250.0,
+         "activities": 2, "activity_seconds": 5400, "activity_distance_m": 16000.0 }
+```
+
+## Changes from the legacy Node API
+
+| Legacy (Express + MongoDB)                  | Now |
+|---------------------------------------------|-----|
+| `POST /api/v1/users/create`                 | `POST /api/v1/auth/register` (no `confPasswd`; confirm on the client) |
+| `POST /api/v1/users/login`                  | `POST /api/v1/auth/login` (same `login` + `password` body) |
+| `POST /api/v1/users/renewToken`             | Removed — sessions slide forward on use |
+| `POST /api/v1/users/getAllUsers` (public!)  | `GET /api/v1/users`, admin only |
+| `POST /api/v1/exercises/create`             | `POST /api/v1/exercises` (`ytVideoID` → `video_id`, `muscleGroup[]` → `primary_muscle` + `secondary_muscles`) |
+| `GET /api/v1/exercises/getAll`              | `GET /api/v1/exercises` |
+| Playlists (model only, never routed)        | Routines |
+| 30-minute JWTs, token also in a cookie      | Opaque bearer sessions stored hashed server-side |
+| Roles `user` / `admin` / `superadmin`       | `user` / `admin` (`superadmin` had no distinct permission) |
