@@ -9,6 +9,7 @@ pub mod error;
 pub mod exercises;
 mod extract;
 mod pagination;
+pub mod places;
 pub mod routines;
 pub mod stats;
 pub mod users;

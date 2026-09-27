@@ -20,7 +20,8 @@ use tower_http::{
 use tracing::Level;
 
 use crate::{
-    activities, auth, config::Config, error::ApiError, exercises, routines, stats, users, workouts,
+    activities, auth, config::Config, error::ApiError, exercises, places, routines, stats, users,
+    workouts,
 };
 
 const REQUEST_ID: HeaderName = HeaderName::from_static("x-request-id");
@@ -38,6 +39,7 @@ pub fn router(state: AppState) -> Router {
         .merge(users::router())
         .merge(exercises::router())
         .merge(routines::router())
+        .merge(places::router())
         .merge(workouts::router())
         .merge(activities::router())
         .merge(stats::router())

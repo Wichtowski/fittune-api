@@ -130,6 +130,35 @@ Exercise = ExerciseInput + { id, is_custom, archived_at, created_at, updated_at 
 Only completed sets in finished workouts count; warm-up sets are listed but never count towards
 metrics or records.
 
+## Workout places
+
+Places belong to the authenticated user and contain equipment categories from the exercise catalog.
+Home and Gym suggestions are editable client presets; `custom` supports any named setup, and users may have multiple places of the same type.
+
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/api/v1/places` | `Place[]`, active places sorted by name |
+| PUT | `/api/v1/places/{id}` | Client-generated UUID; `PlaceInput` → `201` created / `200` updated, returns `Place` |
+| DELETE | `/api/v1/places/{id}` | `204`; archives the place without changing workout history |
+
+```json
+PlaceInput {
+  "name": "Home",
+  "kind": "home" | "gym" | "custom",
+  "equipment": ["dumbbell", "band"]
+}
+Place = PlaceInput + { "id": "uuid", "version_id": "uuid" }
+```
+
+Names are trimmed and limited to 1-80 characters.
+Equipment accepts up to eight categories: `barbell`, `dumbbell`, `kettlebell`, `machine`, `cable`, `band`, `plate`, `other`.
+Bodyweight is always available; an empty list means bodyweight-only, and `none` is rejected.
+Duplicate equipment entries are removed and the list is stored in a fixed order.
+Saving changed details creates an immutable version; replaying the current values, in any order, returns the current version.
+A `PUT` to a new id creates the place; a `PUT` to an archived place or to another user's place returns `404`.
+A user can keep at most 10 active places; creating another returns `409 conflict` until one is archived.
+Archived places cannot be edited or listed, but their existing versions remain valid for delayed offline workout uploads by their owner.
+
 ## Workouts
 
 A workout is written as one document. The client owns the ids of the workout, its exercises and
@@ -148,6 +177,7 @@ revision gets `409 conflict`. A workout is *in progress* while `ended_at` is `nu
 WorkoutInput {
   "title": "Push Day", "notes": null,
   "routine_id": "uuid" | null,               // silently dropped if the routine no longer exists
+  "place_version_id": "uuid" | null,         // optional; selects an immutable owned place version
   "started_at": "…", "ended_at": "…" | null,
   "revision": 12,
   "exercises": [{
@@ -161,9 +191,15 @@ WorkoutInput {
 }
 Workout = WorkoutInput + { id, created_at, updated_at }, and each exercise adds
           { exercise_name, tracking, primary_muscle }
+          The response replaces place_version_id with place: Place | null
 WorkoutSummary { id, routine_id, title, started_at, ended_at, duration_seconds, exercise_count,
-                 set_count, total_reps, volume_kg, exercise_names }
+                 set_count, total_reps, volume_kg, exercise_names, place: Place | null }
 ```
+
+Omitting `place_version_id` preserves an existing selection, so older clients remain compatible; explicit `null` clears it.
+Unknown or foreign versions return `422` with a `place_version_id` field error.
+Workout responses and history retain the selected version's name, type and equipment after a place is edited or archived.
+Equipment is a picker filter, not a restriction on saving exercises.
 
 Limits: 60 exercises, 60 sets per exercise, workouts up to 24 h, reps 0–1000, weight 0–1000 kg,
 RPE 1–10. Order in the arrays is the display order.
