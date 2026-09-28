@@ -96,19 +96,19 @@ pub const ACCOUNTS: [Account; 4] = [
                 "distance_unit": "km",
             })
         },
-        summary: "12 weeks of push/pull/legs plus a session today, records, routines, 2 places, custom exercises, runs and rides",
+        summary: "12 weeks of push/pull/legs plus a session today, records, routines, 2 places, custom exercises, runs and rides, friends with casual, a friend request from newbie",
     },
     Account {
         kind: Kind::Casual,
         username: "casual",
         profile: || json!({ "display_name": "Sam Casual", "weight_unit": "lb", "distance_unit": "mi" }),
-        summary: "lb/mi units, 6 light weeks, a workout in progress to continue from the Workout tab",
+        summary: "lb/mi units, 6 light weeks, a workout in progress to continue from the Workout tab, friends with demo sharing sessions only",
     },
     Account {
         kind: Kind::Newbie,
         username: "newbie",
         profile: || json!({ "display_name": "Nia Newbie" }),
-        summary: "new account: no places, routines or history",
+        summary: "new account: no places, routines or history, a pending friend request to demo",
     },
 ];
 

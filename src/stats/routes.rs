@@ -1,5 +1,7 @@
 use axum::{Router, extract::State, routing::get};
 use serde::Deserialize;
+use sqlx::PgPool;
+use uuid::Uuid;
 
 use super::{
     model::{
@@ -27,21 +29,28 @@ async fn overview(
     auth: Auth,
     Query(query): Query<PeriodQuery>,
 ) -> ApiResult<axum::Json<Overview>> {
+    Ok(axum::Json(
+        overview_for(&state.db, auth.user_id(), &query).await?,
+    ))
+}
+
+/// Totals for the period and the one before it, plus the weekly streak of `user_id`
+pub async fn overview_for(db: &PgPool, user_id: Uuid, query: &PeriodQuery) -> ApiResult<Overview> {
     let period = query.validate()?;
     let tz = query.tz.as_str();
-    let current = repo::totals(&state.db, auth.user_id(), period, tz)
+    let current = repo::totals(db, user_id, period, tz)
         .await
         .map_err(time_zone_error)?;
-    let previous = repo::totals(&state.db, auth.user_id(), period.previous(), tz).await?;
-    let (weeks, current_week) = repo::active_weeks(&state.db, auth.user_id(), tz).await?;
+    let previous = repo::totals(db, user_id, period.previous(), tz).await?;
+    let (weeks, current_week) = repo::active_weeks(db, user_id, tz).await?;
 
-    Ok(axum::Json(Overview {
+    Ok(Overview {
         from: period.from,
         to: period.to,
         current,
         previous,
         streak_weeks: week_streak(&weeks, current_week),
-    }))
+    })
 }
 
 #[derive(Debug, Deserialize)]

@@ -235,6 +235,8 @@ pub struct WorkoutSet {
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct WorkoutSummary {
     pub id: Uuid,
+    #[serde(skip)]
+    pub user_id: Uuid,
     pub routine_id: Option<Uuid>,
     pub place: Option<sqlx::types::Json<crate::places::model::Place>>,
     pub title: String,

@@ -35,7 +35,7 @@ async fn list(
 ) -> ApiResult<axum::Json<Page<Activity>>> {
     let limit = pagination::clamp_limit(query.limit);
     let before = pagination::decode_cursor(query.cursor.as_deref())?;
-    let rows = repo::list(&state.db, auth.user_id(), query.kind, before, limit + 1).await?;
+    let rows = repo::list(&state.db, &[auth.user_id()], query.kind, before, limit + 1).await?;
     Ok(axum::Json(pagination::paginate(rows, limit, |a| {
         (a.started_at, a.id)
     })))
