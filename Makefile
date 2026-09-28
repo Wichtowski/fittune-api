@@ -1,14 +1,21 @@
 # fittune-api — Rust backend
 
 COMPOSE_PROD = docker compose --env-file .env -f docker-compose.prod.yml
+# Local fixtures only exist in builds with the dev-fixtures feature, never in the release image
+SEED_DEV = cargo run --features dev-fixtures -- seed-dev $(if $(BASE_DATE),--base-date $(BASE_DATE))
+FIXTURES_DATABASE_URL ?= $(or $(FITTUNE_FIXTURES_DATABASE_URL),$(shell sed -n 's/^FITTUNE_FIXTURES_DATABASE_URL=//p' .env 2>/dev/null))
 
-.PHONY: help up down run check fmt lint test build docker-build backend-compose create-admin grant-admin prod-create-admin prod-grant-admin prod-ps prod-logs
+.PHONY: help up down run seed seed-reset reset run-fixtures check fmt lint test build docker-build backend-compose create-admin grant-admin prod-create-admin prod-grant-admin prod-ps prod-logs
 
 help:
 	@echo "fittune-api targets:"
 	@echo "  up              — start local Postgres and RustFS (docker compose)"
 	@echo "  down            — stop local infrastructure"
 	@echo "  run             — run the API against .env (applies migrations on start)"
+	@echo "  seed            — create/update the local fixture database (FITTUNE_FIXTURES_DATABASE_URL); BASE_DATE=YYYY-MM-DD optional"
+	@echo "  seed-reset      — delete the fixture accounts and their data, then seed again"
+	@echo "  reset           — drop and recreate the whole fixture database, migrate, seed"
+	@echo "  run-fixtures    — run the API against the fixture database"
 	@echo "  check           — cargo check"
 	@echo "  fmt             — cargo fmt"
 	@echo "  lint            — rustfmt --check + clippy -D warnings"
@@ -32,8 +39,21 @@ down:
 run:
 	cargo run -- serve
 
+seed:
+	$(SEED_DEV)
+
+seed-reset:
+	$(SEED_DEV) --reset
+
+reset:
+	$(SEED_DEV) --drop
+
+run-fixtures:
+	@test -n "$(FIXTURES_DATABASE_URL)" || (echo "set FITTUNE_FIXTURES_DATABASE_URL in .env, see .env.example" && exit 1)
+	FITTUNE_DATABASE_URL="$(FIXTURES_DATABASE_URL)" cargo run -- serve
+
 check:
-	cargo check --all-targets
+	cargo check --all-targets --all-features
 
 fmt:
 	cargo fmt
@@ -41,9 +61,10 @@ fmt:
 lint:
 	cargo fmt --check
 	cargo clippy --all-targets -- -D warnings
+	cargo clippy --all-targets --all-features -- -D warnings
 
 test:
-	cargo test --all-targets
+	cargo test --all-targets --all-features
 
 build:
 	cargo build --release --locked

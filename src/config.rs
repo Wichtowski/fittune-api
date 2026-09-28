@@ -47,7 +47,11 @@ impl Config {
     pub fn from_env() -> Result<Self> {
         let database_url =
             env::var("FITTUNE_DATABASE_URL").context("FITTUNE_DATABASE_URL must be set")?;
+        Self::from_env_with_database(database_url)
+    }
 
+    /// Everything but the database from the environment, for tools with their own database.
+    pub fn from_env_with_database(database_url: String) -> Result<Self> {
         let bind_addr = var_or("FITTUNE_BIND_ADDR", "0.0.0.0:4733")
             .parse()
             .context("FITTUNE_BIND_ADDR must be a socket address such as 0.0.0.0:4733")?;
