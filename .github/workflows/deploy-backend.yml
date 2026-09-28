@@ -42,6 +42,10 @@ jobs:
           cp "${RUNNER_TEMP}/${DEPLOY_ARCHIVE}" "${DEPLOY_ARCHIVE}"
 
       - name: Build production env file
+        env:
+          FITTUNE_PHOTOS_BUCKET: ${{ vars.FITTUNE_PHOTOS_BUCKET || 'fittune-progress-photos' }}
+          FITTUNE_PHOTOS_ACCESS_KEY: ${{ secrets.FITTUNE_PHOTOS_ACCESS_KEY }}
+          FITTUNE_PHOTOS_SECRET_KEY: ${{ secrets.FITTUNE_PHOTOS_SECRET_KEY }}
         run: |
           cat > .env.production <<'ENVEOF'
           ${{ secrets.ENV_PRODUCTION }}
@@ -49,6 +53,21 @@ jobs:
 
           sed -i '/^FITTUNE_APP_VERSION=/d' .env.production
           printf '\nFITTUNE_APP_VERSION=%s\n' "${RELEASE_VERSION}" >> .env.production
+
+          # Photo storage credentials live in their own secrets; they override ENV_PRODUCTION when set
+          for name in FITTUNE_PHOTOS_BUCKET FITTUNE_PHOTOS_ACCESS_KEY FITTUNE_PHOTOS_SECRET_KEY; do
+            if [ -n "${!name}" ]; then
+              sed -i "/^${name}=/d" .env.production
+              printf '%s=%s\n' "${name}" "${!name}" >> .env.production
+            fi
+          done
+
+      # Fail before touching the VPS: the deploy step stops the running stack before starting the new one
+      - name: Validate production compose config
+        run: |
+          cp .env.production .env
+          docker compose --env-file .env.production -f docker-compose.prod.yml config --quiet
+          rm .env
 
       - name: Copy release files to VPS
         uses: appleboy/scp-action@v1.0.0
