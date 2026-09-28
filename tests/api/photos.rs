@@ -67,7 +67,7 @@ async fn private_upload_retry_read_and_delete(pool: PgPool) {
     let workout_id = uuid();
     let (status, _) = app
         .put(
-            &format!("/api/v1/workouts/{workout_id}"),
+            &format!("/api/v1/train/workouts/{workout_id}"),
             &owner.token,
             workout(
                 &exercise,
@@ -79,7 +79,7 @@ async fn private_upload_retry_read_and_delete(pool: PgPool) {
         .await;
     assert_eq!(status, StatusCode::CREATED);
     let photo_id = uuid();
-    let url = format!("/api/v1/progress-photos/{photo_id}");
+    let url = format!("/api/v1/train/progress-photos/{photo_id}");
     let body = form(&workout_id, &png());
     let (status, _, bytes) = app
         .raw(
@@ -108,10 +108,12 @@ async fn private_upload_retry_read_and_delete(pool: PgPool) {
         )
         .await;
     assert_eq!(status, StatusCode::OK);
-    let (status, owner_photos) = app.get("/api/v1/progress-photos", &owner.token).await;
+    let (status, owner_photos) = app.get("/api/v1/train/progress-photos", &owner.token).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(owner_photos.as_array().map(Vec::len), Some(1));
-    let (status, stranger_photos) = app.get("/api/v1/progress-photos", &stranger.token).await;
+    let (status, stranger_photos) = app
+        .get("/api/v1/train/progress-photos", &stranger.token)
+        .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(stranger_photos.as_array().map(Vec::len), Some(0));
     let file_url = format!("{url}/file");
@@ -140,7 +142,7 @@ async fn private_upload_retry_read_and_delete(pool: PgPool) {
     let (status, _, _) = app
         .raw(
             Method::PUT,
-            &format!("/api/v1/progress-photos/{}", uuid()),
+            &format!("/api/v1/train/progress-photos/{}", uuid()),
             Some(&owner.token),
             Some("multipart/form-data; boundary=test-boundary"),
             form(&workout_id, &png()),
@@ -167,7 +169,7 @@ async fn rejects_invalid_images_and_foreign_workouts(pool: PgPool) {
     let exercise = app.catalog_exercise("Barbell Bench Press").await;
     let workout_id = uuid();
     app.put(
-        &format!("/api/v1/workouts/{workout_id}"),
+        &format!("/api/v1/train/workouts/{workout_id}"),
         &other.token,
         workout(
             &exercise,
@@ -177,7 +179,7 @@ async fn rejects_invalid_images_and_foreign_workouts(pool: PgPool) {
         ),
     )
     .await;
-    let url = format!("/api/v1/progress-photos/{}", uuid());
+    let url = format!("/api/v1/train/progress-photos/{}", uuid());
     let (status, _, _) = app
         .raw(
             Method::PUT,
@@ -207,7 +209,7 @@ async fn photo_route_allows_more_than_json_limit_but_rejects_oversized_uploads(p
     let exercise = app.catalog_exercise("Barbell Bench Press").await;
     let workout_id = uuid();
     app.put(
-        &format!("/api/v1/workouts/{workout_id}"),
+        &format!("/api/v1/train/workouts/{workout_id}"),
         &owner.token,
         workout(
             &exercise,
@@ -222,7 +224,7 @@ async fn photo_route_allows_more_than_json_limit_but_rejects_oversized_uploads(p
     let (status, _, bytes) = app
         .raw(
             Method::PUT,
-            &format!("/api/v1/progress-photos/{}", uuid()),
+            &format!("/api/v1/train/progress-photos/{}", uuid()),
             Some(&owner.token),
             Some("multipart/form-data; boundary=test-boundary"),
             form(&workout_id, &image),
@@ -239,7 +241,7 @@ async fn photo_route_allows_more_than_json_limit_but_rejects_oversized_uploads(p
     let (status, _, _) = app
         .raw(
             Method::PUT,
-            &format!("/api/v1/progress-photos/{}", uuid()),
+            &format!("/api/v1/train/progress-photos/{}", uuid()),
             Some(&owner.token),
             Some("multipart/form-data; boundary=test-boundary"),
             form(&workout_id, &image),
