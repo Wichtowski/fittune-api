@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::media::ExerciseMedia;
 use crate::{
     equipment::{self, EquipmentItem},
     error::{ApiResult, FieldErrors},
@@ -80,13 +81,18 @@ pub struct Exercise {
     /// Every equipment item the exercise needs; empty for bodyweight exercises
     pub requires: Vec<EquipmentItem>,
     pub difficulty: Difficulty,
-    /// YouTube video id demonstrating the movement.
+    /// YouTube video id demonstrating the movement: the first YouTube video in `media`, kept
+    /// for clients that predate `media`
+    #[sqlx(skip)]
     pub video_id: Option<String>,
     pub instructions: Option<String>,
     pub is_custom: bool,
     pub archived_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Photos, then videos, each in position order; filled by `media::attach`
+    #[sqlx(skip)]
+    pub media: Vec<ExerciseMedia>,
 }
 
 #[derive(Debug, Deserialize)]

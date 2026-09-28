@@ -66,9 +66,11 @@ async fn create(
         Some(auth.user_id())
     };
     let draft = request.validate()?;
-    let exercise = repo::insert(&state.db, owner, &draft)
+    let mut tx = state.db.begin().await?;
+    let exercise = repo::insert(&mut tx, owner, &draft)
         .await
         .map_err(duplicate_name)?;
+    tx.commit().await?;
     Ok((StatusCode::CREATED, axum::Json(exercise)))
 }
 
@@ -80,9 +82,11 @@ async fn update(
 ) -> ApiResult<axum::Json<Exercise>> {
     let existing = editable(&state, &auth, id).await?;
     let draft = request.validate()?;
-    let exercise = repo::update(&state.db, existing.id, &draft)
+    let mut tx = state.db.begin().await?;
+    let exercise = repo::update(&mut tx, existing.id, &draft)
         .await
         .map_err(duplicate_name)?;
+    tx.commit().await?;
     Ok(axum::Json(exercise))
 }
 

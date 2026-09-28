@@ -142,6 +142,7 @@ A shared catalog (seeded, admin-managed) plus each user's private custom exercis
 | PUT    | `/api/v1/exercises/{id}` | Full replace. Owners edit custom exercises; admins edit the catalog. |
 | DELETE | `/api/v1/exercises/{id}` | Archives (hides from the library, keeps history). `204` |
 | GET    | `/api/v1/exercises/{id}/history?sessions=30` | Per-session breakdown and all-time records. |
+| GET    | `/api/v1/exercise-media/{id}/file` | Catalog photo as JPEG. **No auth**, `Cache-Control: public, max-age=31536000, immutable`. `404` for videos, custom exercises' media and photos not stored yet. |
 
 ```json
 ExerciseInput {
@@ -151,7 +152,7 @@ ExerciseInput {
   "equipment": "none" | "barbell" | "dumbbell" | "kettlebell" | "machine" | "cable" | "band" | "plate" | "other",
   "requires": [EquipmentItem],                // everything the exercise needs; [] for bodyweight
   "difficulty": "beginner" | "intermediate" | "advanced",
-  "video_id": "dQw4w9WgXcQ" | null,           // YouTube id
+  "video_id": "dQw4w9WgXcQ" | null,           // YouTube id; stored as the exercise's first video
   "instructions": "…" | null
 }
 EquipmentItem = "barbell" | "ez_bar" | "dumbbells" | "kettlebells"
@@ -163,8 +164,15 @@ EquipmentItem = "barbell" | "ez_bar" | "dumbbells" | "kettlebells"
               | "resistance_band" | "ab_wheel" | "jump_rope"
 Muscle = "chest" | "lats" | "upper_back" | "lower_back" | "traps" | "shoulders" | "biceps" | "triceps"
        | "forearms" | "abs" | "quadriceps" | "hamstrings" | "glutes" | "calves" | "full_body" | "cardio"
-Exercise = ExerciseInput + { id, is_custom, archived_at, created_at, updated_at }
+Exercise = ExerciseInput + { id, is_custom, archived_at, created_at, updated_at, media: [ExerciseMedia] }
+ExerciseMedia = { "id", "kind": "photo", "provider": "fittune", "position": 0, "url": "/api/v1/exercise-media/{id}/file" }
+              | { "id", "kind": "video", "provider": "youtube" | "vimeo", "position": 0, "external_id": "hWbUlkb5Ms4" }
 ```
+
+`media` lists photos, then videos, each by `position`; catalog photos are the start (`0`) and finish (`1`) frames.
+A photo's `url` is relative to the API origin and works in a plain `<img src>`.
+In an `Exercise`, `video_id` is the first YouTube video in `media` (a Vimeo video leaves it `null`); it stays for clients that predate `media`.
+Catalog photos are copied from the public domain Free Exercise DB into object storage in the background on API start, so right after a fresh deploy a photo can briefly return `404`.
 
 `equipment` is a display category used for badges and the `equipment=` filter.
 `requires` is what matches exercises to places: an exercise can be done at a place when every item it requires is in the place's `equipment`.

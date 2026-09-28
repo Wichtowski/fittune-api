@@ -62,6 +62,7 @@ pub fn router(state: AppState) -> Router {
         .merge(users::router())
         .merge(invites::router())
         .merge(exercises::router())
+        .merge(exercises::media::router())
         .merge(routines::router())
         .merge(places::router())
         .merge(workouts::router())
