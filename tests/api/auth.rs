@@ -2,7 +2,7 @@ use axum::http::{Method, StatusCode};
 use serde_json::json;
 use sqlx::PgPool;
 
-use crate::common::{PASSWORD, TestApp};
+use crate::common::{PASSWORD, TestApp, uuid};
 
 #[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
 async fn register_returns_user_and_working_session(pool: PgPool) {
@@ -261,6 +261,53 @@ async fn account_deletion_requires_password(pool: PgPool) {
         app.get("/api/v1/me", &user.token).await.0,
         StatusCode::UNAUTHORIZED
     );
+}
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn account_deletion_removes_custom_exercises_in_use(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let user = app.register("lifter").await;
+    let (status, exercise) = app
+        .post(
+            "/api/v1/exercises",
+            Some(&user.token),
+            json!({ "name": "Zercher Squat", "tracking": "weight_reps", "primary_muscle": "quadriceps" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let exercise_id = exercise["id"].as_str().expect("exercise id");
+    let (status, _) = app
+        .post(
+            "/api/v1/routines",
+            Some(&user.token),
+            json!({ "name": "Legs", "exercises": [{ "exercise_id": exercise_id }] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (status, _) = app
+        .put(
+            &format!("/api/v1/workouts/{}", uuid()),
+            &user.token,
+            json!({
+                "title": "Legs",
+                "started_at": "2026-09-01T10:00:00Z",
+                "ended_at": "2026-09-01T11:00:00Z",
+                "revision": 1,
+                "exercises": [{ "id": uuid(), "exercise_id": exercise_id, "sets": [] }]
+            }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let (status, body) = app
+        .request(
+            Method::DELETE,
+            "/api/v1/me",
+            Some(&user.token),
+            Some(json!({ "password": PASSWORD })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
 }
 
 #[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
