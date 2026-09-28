@@ -17,13 +17,16 @@ use crate::{
 };
 
 #[derive(Default)]
-struct MemoryPhotos(Mutex<HashMap<String, Vec<u8>>>);
+pub struct MemoryPhotos(pub Mutex<HashMap<String, Vec<u8>>>);
 
 #[async_trait]
 impl PhotoStore for MemoryPhotos {
     async fn put(&self, key: &str, bytes: Vec<u8>) -> Result<()> {
         self.0.lock().expect("lock").insert(key.into(), bytes);
         Ok(())
+    }
+    async fn exists(&self, key: &str) -> Result<bool> {
+        Ok(self.0.lock().expect("lock").contains_key(key))
     }
     async fn get(&self, key: &str) -> Result<Vec<u8>> {
         self.0
