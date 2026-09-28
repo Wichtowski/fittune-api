@@ -1,6 +1,7 @@
 use std::{env, net::SocketAddr, time::Duration};
 
 use anyhow::{Context, Result, bail};
+use axum::http::HeaderName;
 
 /// Runtime configuration, read from `FITTUNE_*` environment variables.
 #[derive(Debug, Clone)]
@@ -13,6 +14,10 @@ pub struct Config {
     pub app_version: String,
     pub log_format: LogFormat,
     pub photo_storage: Option<PhotoStorageConfig>,
+    pub registration: Registration,
+    /// Header carrying the client IP from a trusted reverse proxy, such as `X-Real-IP`.
+    /// Without it the socket address is used, which behind a proxy is the proxy itself
+    pub client_ip_header: Option<HeaderName>,
 }
 
 #[derive(Debug, Clone)]
@@ -21,6 +26,15 @@ pub struct PhotoStorageConfig {
     pub bucket: String,
     pub access_key: String,
     pub secret_key: String,
+}
+
+/// Who may create an account
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Registration {
+    /// Only with an invite code from an admin; the default, so new installations start closed
+    InviteOnly,
+    /// Anyone; for local development and tests
+    Open,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,6 +87,19 @@ impl Config {
             None => None,
         };
 
+        let registration = match var_or("FITTUNE_REGISTRATION", "invite_only").as_str() {
+            "invite_only" => Registration::InviteOnly,
+            "open" => Registration::Open,
+            other => bail!("FITTUNE_REGISTRATION must be `invite_only` or `open`, got `{other}`"),
+        };
+
+        let client_ip_header = env::var("FITTUNE_CLIENT_IP_HEADER")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .map(|value| HeaderName::try_from(value.trim()))
+            .transpose()
+            .context("FITTUNE_CLIENT_IP_HEADER must be a valid header name")?;
+
         Ok(Self {
             database_url,
             db_max_connections,
@@ -82,6 +109,8 @@ impl Config {
             app_version: var_or("FITTUNE_APP_VERSION", "dev"),
             log_format,
             photo_storage,
+            registration,
+            client_ip_header,
         })
     }
 }

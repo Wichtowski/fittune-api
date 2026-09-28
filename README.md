@@ -16,11 +16,12 @@ only through the HTTP contract in [`docs/API.md`](docs/API.md).
 
 ```text
 src/
-├── main.rs          - CLI: serve | migrate | healthcheck | grant-admin
+├── main.rs          - CLI: serve | migrate | healthcheck | create-admin | grant-admin
 ├── app.rs           - router assembly and middleware stack
 ├── config.rs        - FITTUNE_* environment configuration
 ├── error.rs         - ApiError → JSON error responses, field-level validation errors
 ├── auth/            - registration, login, sessions, `Auth` extractor
+├── invites/         - admin-issued invite codes for invite-only registration
 ├── users/           - profile, password change, account deletion, admin directory
 ├── exercises/       - catalog + custom exercises, per-exercise history and records
 ├── routines/        - reusable workout plans
@@ -60,12 +61,12 @@ original file and its EXIF metadata are never stored. A thumbnail and full-size 
 in RustFS, and only authenticated API endpoints can read them. Use separate, random
 `FITTUNE_PHOTOS_ACCESS_KEY` and `FITTUNE_PHOTOS_SECRET_KEY` values outside local development.
 
-To make someone an admin (can manage the shared exercise catalog and list users):
+`.env.example` sets `FITTUNE_REGISTRATION=open`, so local sign-up works without invites.
+Admins manage the shared exercise catalog, list users and issue invite codes:
 
 ```bash
-make grant-admin LOGIN=oskyy                                           # locally
-docker compose --env-file .env -f docker-compose.prod.yml \
-  exec fittune-api /usr/local/bin/fittune-api grant-admin oskyy        # on the VPS
+make create-admin USERNAME=root EMAIL=root@example.com   # new admin, prompts for the password
+make grant-admin LOGIN=oskyy                             # promote an existing account
 ```
 
 ## Configuration
@@ -83,6 +84,8 @@ docker compose --env-file .env -f docker-compose.prod.yml \
 | `FITTUNE_PHOTOS_ENDPOINT` | — | RustFS S3 endpoint; photo API is unavailable when unset |
 | `FITTUNE_PHOTOS_BUCKET` | — | Private bucket, created by Compose |
 | `FITTUNE_PHOTOS_ACCESS_KEY` / `FITTUNE_PHOTOS_SECRET_KEY` | — | RustFS credentials; required with the endpoint |
+| `FITTUNE_REGISTRATION` | `invite_only` | `invite_only` (sign-up needs an admin's invite code) or `open` (local development only) |
+| `FITTUNE_CLIENT_IP_HEADER` | (unset) | Header with the client IP set by a trusted proxy, used to rate-limit invite guessing; `X-Real-IP` in production |
 
 ## Deployment
 
@@ -137,3 +140,37 @@ FITTUNE_CORS_ORIGINS=https://fittune.oskarwichtowski.com
 `FITTUNE_APP_VERSION` is injected from the release tag.
 
 Useful commands on the VPS (from `DEPLOY_PATH`): `make prod-ps`, `make prod-logs`.
+
+### Invite-only registration and the first admin
+
+Production registration is invite-only by default: `POST /api/v1/auth/register` needs a code an admin issued, and a fresh installation with no admin stays closed.
+Nobody is ever promoted automatically, so an operator creates the first admin on the VPS.
+Run these from `DEPLOY_PATH` in an interactive SSH session.
+
+If the admin already has an account, promote it:
+
+```bash
+make prod-grant-admin LOGIN=<username-or-email>
+```
+
+On a fresh installation, create the admin instead:
+
+```bash
+make prod-create-admin USERNAME=<username> EMAIL=<email>
+```
+
+The command prompts for the password twice without echoing it, and applies the same password policy and hashing as sign-up.
+Never pass the password as an argument or through an environment variable, and never paste it into issues, PRs or chat.
+
+Verify after deploying (record only the non-sensitive outcomes, for example in the release notes):
+
+1. Sign in to the app as the admin and open Profile → Invites.
+2. Create an invite and check it is listed as active; the code is shown only once.
+3. In a private window, try to sign up without a code and check it is rejected with "An invite code is required".
+4. Sign up with the code, then check the invite is listed as used and the new account is not an admin.
+
+Recovery:
+
+- Lost admin password: create another admin with `make prod-create-admin`, sign in, and change or remove the old account.
+- A code leaked: revoke it in Profile → Invites; accounts it already created stay and can be deleted by their owner.
+- Locked out by the rate limit (10 wrong codes per client in 15 minutes): wait for the window to pass, or restart the API container (`backend-control.yml`), which clears the in-memory counters.

@@ -7,7 +7,7 @@ use axum::{
 };
 use fittune_api::{
     AppState,
-    config::{Config, LogFormat},
+    config::{Config, LogFormat, Registration},
     photos::PhotoStore,
     router,
 };
@@ -29,11 +29,24 @@ pub struct TestUser {
 }
 
 impl TestApp {
+    /// Open registration, so tests can create users freely
     pub fn new(pool: PgPool) -> Self {
-        Self::with_photos(pool, None)
+        Self::with_registration_and_photos(pool, Registration::Open, None)
+    }
+
+    pub fn invite_only(pool: PgPool) -> Self {
+        Self::with_registration_and_photos(pool, Registration::InviteOnly, None)
     }
 
     pub fn with_photos(pool: PgPool, photos: Option<Arc<dyn PhotoStore>>) -> Self {
+        Self::with_registration_and_photos(pool, Registration::Open, photos)
+    }
+
+    fn with_registration_and_photos(
+        pool: PgPool,
+        registration: Registration,
+        photos: Option<Arc<dyn PhotoStore>>,
+    ) -> Self {
         let config = Config {
             database_url: String::new(),
             db_max_connections: 5,
@@ -43,12 +56,12 @@ impl TestApp {
             app_version: "test".into(),
             log_format: LogFormat::Pretty,
             photo_storage: None,
+            registration,
+            client_ip_header: Some(header::HeaderName::from_static("x-real-ip")),
         };
-        let router = router(AppState {
-            db: pool.clone(),
-            config: Arc::new(config),
-            photos,
-        });
+        let mut state = AppState::new(pool.clone(), config);
+        state.photos = photos;
+        let router = router(state);
         Self { router, pool }
     }
 
@@ -93,7 +106,22 @@ impl TestApp {
         token: Option<&str>,
         body: Option<Value>,
     ) -> (StatusCode, Value) {
+        self.request_from(None, method, uri, token, body).await
+    }
+
+    /// A request as if forwarded by the proxy for client `ip`
+    pub async fn request_from(
+        &self,
+        ip: Option<&str>,
+        method: Method,
+        uri: &str,
+        token: Option<&str>,
+        body: Option<Value>,
+    ) -> (StatusCode, Value) {
         let mut builder = Request::builder().method(method).uri(uri);
+        if let Some(ip) = ip {
+            builder = builder.header("x-real-ip", ip);
+        }
         if let Some(token) = token {
             builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
         }

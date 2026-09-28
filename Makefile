@@ -2,7 +2,7 @@
 
 COMPOSE_PROD = docker compose --env-file .env -f docker-compose.prod.yml
 
-.PHONY: help up down run check fmt lint test build docker-build backend-compose grant-admin prod-ps prod-logs
+.PHONY: help up down run check fmt lint test build docker-build backend-compose create-admin grant-admin prod-create-admin prod-grant-admin prod-ps prod-logs
 
 help:
 	@echo "fittune-api targets:"
@@ -16,7 +16,9 @@ help:
 	@echo "  build           — release build"
 	@echo "  docker-build    — build the production image"
 	@echo "  backend-compose — build and run Postgres + API with Docker Compose"
-	@echo "  grant-admin     — promote a user: make grant-admin LOGIN=<username-or-email>"
+	@echo "  create-admin    - new admin, prompts for the password: make create-admin USERNAME=<u> EMAIL=<e>"
+	@echo "  grant-admin     - promote a user: make grant-admin LOGIN=<username-or-email>"
+	@echo "  prod-create-admin / prod-grant-admin - the same on the VPS"
 	@echo "  prod-ps         — (VPS) show production containers"
 	@echo "  prod-logs       — (VPS) follow production API logs"
 
@@ -52,9 +54,22 @@ docker-build:
 backend-compose:
 	docker compose up --build fittune-postgres fittune-api
 
+create-admin:
+	@test -n "$(USERNAME)" -a -n "$(EMAIL)" || (echo "usage: make create-admin USERNAME=<username> EMAIL=<email>" && exit 1)
+	cargo run -- create-admin "$(USERNAME)" "$(EMAIL)"
+
 grant-admin:
 	@test -n "$(LOGIN)" || (echo "usage: make grant-admin LOGIN=<username-or-email>" && exit 1)
 	cargo run -- grant-admin "$(LOGIN)"
+
+# -it keeps a terminal attached so the password prompt does not echo
+prod-create-admin:
+	@test -n "$(USERNAME)" -a -n "$(EMAIL)" || (echo "usage: make prod-create-admin USERNAME=<username> EMAIL=<email>" && exit 1)
+	$(COMPOSE_PROD) exec -it fittune-api /usr/local/bin/fittune-api create-admin "$(USERNAME)" "$(EMAIL)"
+
+prod-grant-admin:
+	@test -n "$(LOGIN)" || (echo "usage: make prod-grant-admin LOGIN=<username-or-email>" && exit 1)
+	$(COMPOSE_PROD) exec fittune-api /usr/local/bin/fittune-api grant-admin "$(LOGIN)"
 
 prod-ps:
 	$(COMPOSE_PROD) ps

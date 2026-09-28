@@ -37,6 +37,8 @@ services:
       FITTUNE_BIND_ADDR: 0.0.0.0:4733
       FITTUNE_LOG_FORMAT: json
       FITTUNE_PHOTOS_ENDPOINT: http://fittune-rustfs:9000
+      # Caddy sets it to the real client IP; the API is only reachable through the edge network
+      FITTUNE_CLIENT_IP_HEADER: X-Real-IP
     command: ["serve"]
     depends_on:
       fittune-postgres:
