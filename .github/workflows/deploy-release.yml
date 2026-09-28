@@ -38,4 +38,7 @@ jobs:
     name: Deploy backend to VPS
     needs: validate_ref
     uses: ./.github/workflows/deploy-backend.yml
+    permissions:
+      contents: read
+      packages: write
     secrets: inherit

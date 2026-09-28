@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: read
+  # Push the release image to GHCR; the VPS pulls it with the same short-lived token
+  packages: write
 
 concurrency:
   group: deploy-backend-${{ github.ref }}
@@ -17,8 +19,10 @@ jobs:
 
     env:
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-      DEPLOY_ARCHIVE: ${{ vars.DEPLOY_ARCHIVE }}
       RELEASE_VERSION: ${{ github.ref_name }}
+      IMAGE: ghcr.io/wichtowski/fittune-api
+      # Unique per run, so concurrent or retried deploys never share uploaded files
+      RELEASE_DIR: /tmp/fittune-release-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - name: Checkout selected ref
@@ -26,20 +30,6 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.ref }}
-
-      - name: Package repository
-        run: |
-          rm -f "${DEPLOY_ARCHIVE}" "${RUNNER_TEMP}/${DEPLOY_ARCHIVE}"
-
-          tar \
-            --exclude=.git \
-            --exclude=.github \
-            --exclude=target \
-            --exclude=.env \
-            --exclude=.env.* \
-            -czf "${RUNNER_TEMP}/${DEPLOY_ARCHIVE}" .
-
-          cp "${RUNNER_TEMP}/${DEPLOY_ARCHIVE}" "${DEPLOY_ARCHIVE}"
 
       - name: Build production env file
         env:
@@ -62,12 +52,36 @@ jobs:
             fi
           done
 
-      # Fail before touching the VPS: the deploy step stops the running stack before starting the new one
+      # Fail before touching the VPS, while the running stack is still untouched
       - name: Validate production compose config
         run: |
           cp .env.production .env
           docker compose --env-file .env.production -f docker-compose.prod.yml config --quiet
           rm .env
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Built once here, so the VPS only pulls and runs it and never needs the source
+      - name: Build and push image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}:${{ env.RELEASE_VERSION }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ env.RELEASE_VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Copy release files to VPS
         uses: appleboy/scp-action@v1.0.0
@@ -76,43 +90,47 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
-          source: "${{ env.DEPLOY_ARCHIVE }},.env.production"
-          target: /tmp
+          # Only what the stack and the operator make targets need; the image holds the app
+          source: "docker-compose.prod.yml,Makefile,.env.production"
+          target: ${{ env.RELEASE_DIR }}
 
       - name: Deploy stack on VPS
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
           script_stop: true
-          envs: DEPLOY_PATH,DEPLOY_ARCHIVE
-          command_timeout: "30m"
+          envs: DEPLOY_PATH,RELEASE_DIR,RELEASE_VERSION,IMAGE,GHCR_USER,GHCR_TOKEN
+          command_timeout: "15m"
           script: |
             set -euo pipefail
+            : "${DEPLOY_PATH:?}" "${RELEASE_DIR:?}"
+
+            # The job token expires when the job ends; drop the stored login either way
+            trap 'docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf "${RELEASE_DIR}"' EXIT
+            printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+
+            # Pull before touching the running stack, so a failed pull leaves it as it was
+            docker pull "${IMAGE}:${RELEASE_VERSION}"
 
             mkdir -p "${DEPLOY_PATH}"
             cd "${DEPLOY_PATH}"
 
-            # Stop existing containers if running. Named volumes (the Postgres data) are kept.
-            if [ -f docker-compose.prod.yml ] && [ -f .env ]; then
-              docker compose --env-file .env -f docker-compose.prod.yml down || true
-            fi
-
-            # Clean up the previous release except .env
+            # Keep only the release files; earlier releases shipped the whole repository
             find . -mindepth 1 -maxdepth 1 ! -name '.env' -exec rm -rf {} +
+            mv "${RELEASE_DIR}/docker-compose.prod.yml" "${RELEASE_DIR}/Makefile" .
+            mv "${RELEASE_DIR}/.env.production" .env
+            chmod 600 .env
 
-            mv /tmp/.env.production "${DEPLOY_PATH}/.env"
-            chmod 600 "${DEPLOY_PATH}/.env"
-
-            # Extract the codebase. Use --no-overwrite-dir to avoid metadata modification/utime errors on existing directories
-            tar -xzf "/tmp/${DEPLOY_ARCHIVE}" --no-overwrite-dir -C "${DEPLOY_PATH}"
-            rm -f "/tmp/${DEPLOY_ARCHIVE}"
-
-            # Build the Rust image on the VPS and start the stack; migrations run on API start-up.
-            docker compose --env-file .env -f docker-compose.prod.yml up -d --build --wait --wait-timeout 180
+            # Recreates only what changed; named volumes (Postgres, RustFS) are kept.
+            # Migrations run on API start-up.
+            docker compose --env-file .env -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 180
             docker compose --env-file .env -f docker-compose.prod.yml ps
 
-            # Drop superseded image layers so repeated Rust builds do not fill the disk.
+            # Drop untagged layers of superseded releases
             docker image prune -f
