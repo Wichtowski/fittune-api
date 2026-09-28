@@ -1,4 +1,4 @@
-//! FitTune API: workouts, activities, exercises and training analytics.
+//! FitTune API: training (FitTune) and nutrition (FitHealth) behind one account.
 
 pub mod activities;
 pub mod app;
@@ -12,6 +12,7 @@ mod extract;
 #[cfg(feature = "dev-fixtures")]
 pub mod fixtures;
 pub mod friends;
+pub mod health;
 pub mod invites;
 mod pagination;
 pub mod photos;
@@ -19,6 +20,7 @@ pub mod places;
 pub mod rate_limit;
 pub mod routines;
 pub mod stats;
+pub mod train;
 pub mod users;
 mod validate;
 pub mod workouts;

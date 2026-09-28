@@ -17,14 +17,14 @@ async fn seed(app: &TestApp, user: &TestUser) {
         ("2026-09-16T17:00:00Z", None),
     ] {
         app.put(
-            &format!("/api/v1/workouts/{}", uuid()),
+            &format!("/api/v1/train/workouts/{}", uuid()),
             &user.token,
             workout(&bench, start, end, 1),
         )
         .await;
     }
     app.put(
-        &format!("/api/v1/activities/{}", uuid()),
+        &format!("/api/v1/train/activities/{}", uuid()),
         &user.token,
         run("2026-09-17T06:00:00Z", 8000.0),
     )
@@ -39,7 +39,7 @@ async fn overview_compares_with_previous_period(pool: PgPool) {
 
     let (status, overview) = app
         .get(
-            "/api/v1/stats/overview?from=2026-09-14&to=2026-09-20&tz=Europe/Warsaw",
+            "/api/v1/train/stats/overview?from=2026-09-14&to=2026-09-20&tz=Europe/Warsaw",
             &user.token,
         )
         .await;
@@ -65,7 +65,7 @@ async fn timeline_is_zero_filled(pool: PgPool) {
 
     let (status, points) = app
         .get(
-            "/api/v1/stats/timeline?from=2026-08-31&to=2026-09-27&bucket=week&tz=UTC",
+            "/api/v1/train/stats/timeline?from=2026-08-31&to=2026-09-27&bucket=week&tz=UTC",
             &user.token,
         )
         .await;
@@ -88,7 +88,7 @@ async fn timeline_is_zero_filled(pool: PgPool) {
 
     let (_, months) = app
         .get(
-            "/api/v1/stats/timeline?from=2026-08-01&to=2026-09-30&bucket=month",
+            "/api/v1/train/stats/timeline?from=2026-08-01&to=2026-09-30&bucket=month",
             &user.token,
         )
         .await;
@@ -103,7 +103,7 @@ async fn muscles_and_records_summarise_training(pool: PgPool) {
 
     let (_, muscles) = app
         .get(
-            "/api/v1/stats/muscles?from=2026-09-01&to=2026-09-30",
+            "/api/v1/train/stats/muscles?from=2026-09-01&to=2026-09-30",
             &user.token,
         )
         .await;
@@ -112,7 +112,7 @@ async fn muscles_and_records_summarise_training(pool: PgPool) {
         json!([{ "muscle": "chest", "sets": 4, "volume_kg": 2000.0 }])
     );
 
-    let (_, records) = app.get("/api/v1/stats/records", &user.token).await;
+    let (_, records) = app.get("/api/v1/train/stats/records", &user.token).await;
     assert_eq!(records.as_array().map(Vec::len), Some(1));
     assert_eq!(records[0]["exercise_name"], "Barbell Bench Press");
     assert_eq!(records[0]["max_weight_kg"], 100.0);
@@ -127,7 +127,7 @@ async fn stats_validate_period_and_time_zone(pool: PgPool) {
 
     let (status, body) = app
         .get(
-            "/api/v1/stats/overview?from=2026-09-20&to=2026-09-01",
+            "/api/v1/train/stats/overview?from=2026-09-20&to=2026-09-01",
             &user.token,
         )
         .await;
@@ -136,7 +136,7 @@ async fn stats_validate_period_and_time_zone(pool: PgPool) {
 
     let (status, body) = app
         .get(
-            "/api/v1/stats/overview?from=2026-09-01&to=2026-09-20&tz=Mars/Olympus",
+            "/api/v1/train/stats/overview?from=2026-09-01&to=2026-09-20&tz=Mars/Olympus",
             &user.token,
         )
         .await;

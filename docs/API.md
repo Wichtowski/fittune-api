@@ -4,6 +4,12 @@ Base URL: `https://api-fittune.oskarwichtowski.com` in production, `http://local
 All endpoints except `/health` and `/api/v1/auth/{register,login}` require
 `Authorization: Bearer <token>`.
 
+## Namespaces
+
+- Account and social endpoints are shared by both apps and live directly under `/api/v1`: `auth`, `me`, `users`, `admin/invites`, `friends`, `blocks`
+- FitTune (training) endpoints live under `/api/v1/train`
+- FitHealth (nutrition) endpoints live under `/api/v1/health`
+
 ## Conventions
 
 - JSON in and out. Timestamps are RFC 3339 UTC (`2026-09-27T17:00:00Z`), dates are `YYYY-MM-DD`.
@@ -48,11 +54,11 @@ through authenticated API endpoints with `Cache-Control: private, no-store`.
 
 | Method | Path | Response |
 |--------|------|----------|
-| POST | `/api/v1/progress-photos` | `201 ProgressPhoto` |
-| PUT | `/api/v1/progress-photos/{id}` | `201 ProgressPhoto`; replay returns `200` |
-| GET | `/api/v1/progress-photos?workout_id=&limit=50&offset=0` | `ProgressPhoto[]`, newest first |
-| GET | `/api/v1/progress-photos/{id}/file?size=full\|thumb` | JPEG image |
-| DELETE | `/api/v1/progress-photos/{id}` | `204`; deletes both stored images |
+| POST | `/api/v1/train/progress-photos` | `201 ProgressPhoto` |
+| PUT | `/api/v1/train/progress-photos/{id}` | `201 ProgressPhoto`; replay returns `200` |
+| GET | `/api/v1/train/progress-photos?workout_id=&limit=50&offset=0` | `ProgressPhoto[]`, newest first |
+| GET | `/api/v1/train/progress-photos/{id}/file?size=full\|thumb` | JPEG image |
+| DELETE | `/api/v1/train/progress-photos/{id}` | `204`; deletes both stored images |
 
 `ProgressPhoto`: `{ id, workout_id, width, height, bytes, taken_at, created_at }`.
 Deleting an account removes its stored images. Deleting a workout keeps its photo in the user's
@@ -136,13 +142,13 @@ A shared catalog (seeded, admin-managed) plus each user's private custom exercis
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET    | `/api/v1/exercises?q=&muscle=&equipment=` | Active catalog + own exercises, sorted by name. `muscle` matches primary or secondary. |
-| GET    | `/api/v1/exercises/{id}` | Also returns archived exercises (history still references them). |
-| POST   | `/api/v1/exercises` | `ExerciseInput`; `"global": true` adds to the catalog (admin only). `201` |
-| PUT    | `/api/v1/exercises/{id}` | Full replace. Owners edit custom exercises; admins edit the catalog. |
-| DELETE | `/api/v1/exercises/{id}` | Archives (hides from the library, keeps history). `204` |
-| GET    | `/api/v1/exercises/{id}/history?sessions=30` | Per-session breakdown and all-time records. |
-| GET    | `/api/v1/exercise-media/{id}/file` | Catalog photo as JPEG. **No auth**, `Cache-Control: public, max-age=31536000, immutable`. `404` for videos, custom exercises' media and photos not stored yet. |
+| GET    | `/api/v1/train/exercises?q=&muscle=&equipment=` | Active catalog + own exercises, sorted by name. `muscle` matches primary or secondary. |
+| GET    | `/api/v1/train/exercises/{id}` | Also returns archived exercises (history still references them). |
+| POST   | `/api/v1/train/exercises` | `ExerciseInput`; `"global": true` adds to the catalog (admin only). `201` |
+| PUT    | `/api/v1/train/exercises/{id}` | Full replace. Owners edit custom exercises; admins edit the catalog. |
+| DELETE | `/api/v1/train/exercises/{id}` | Archives (hides from the library, keeps history). `204` |
+| GET    | `/api/v1/train/exercises/{id}/history?sessions=30` | Per-session breakdown and all-time records. |
+| GET    | `/api/v1/train/exercise-media/{id}/file` | Catalog photo as JPEG. **No auth**, `Cache-Control: public, max-age=31536000, immutable`. `404` for videos, custom exercises' media and photos not stored yet. |
 
 ```json
 ExerciseInput {
@@ -165,7 +171,7 @@ EquipmentItem = "barbell" | "ez_bar" | "dumbbells" | "kettlebells"
 Muscle = "chest" | "lats" | "upper_back" | "lower_back" | "traps" | "shoulders" | "biceps" | "triceps"
        | "forearms" | "abs" | "quadriceps" | "hamstrings" | "glutes" | "calves" | "full_body" | "cardio"
 Exercise = ExerciseInput + { id, is_custom, archived_at, created_at, updated_at, media: [ExerciseMedia] }
-ExerciseMedia = { "id", "kind": "photo", "provider": "fittune", "position": 0, "url": "/api/v1/exercise-media/{id}/file" }
+ExerciseMedia = { "id", "kind": "photo", "provider": "fittune", "position": 0, "url": "/api/v1/train/exercise-media/{id}/file" }
               | { "id", "kind": "video", "provider": "youtube" | "vimeo", "position": 0, "external_id": "hWbUlkb5Ms4" }
 ```
 
@@ -210,9 +216,9 @@ Home and Gym suggestions are editable client presets; `custom` supports any name
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET | `/api/v1/places` | `Place[]`, active places sorted by name |
-| PUT | `/api/v1/places/{id}` | Client-generated UUID; `PlaceInput` → `201` created / `200` updated, returns `Place` |
-| DELETE | `/api/v1/places/{id}` | `204`; archives the place without changing workout history |
+| GET | `/api/v1/train/places` | `Place[]`, active places sorted by name |
+| PUT | `/api/v1/train/places/{id}` | Client-generated UUID; `PlaceInput` → `201` created / `200` updated, returns `Place` |
+| DELETE | `/api/v1/train/places/{id}` | `204`; archives the place without changing workout history |
 
 ```json
 PlaceInput {
@@ -240,10 +246,10 @@ revision gets `409 conflict`. A workout is *in progress* while `ended_at` is `nu
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET    | `/api/v1/workouts?status=in_progress\|completed&limit&cursor` | `Page<WorkoutSummary>`, newest first |
-| GET    | `/api/v1/workouts/{id}` | `Workout` |
-| PUT    | `/api/v1/workouts/{id}` | `WorkoutInput` → `201` created / `200` replaced, returns `Workout` |
-| DELETE | `/api/v1/workouts/{id}` | `204` |
+| GET    | `/api/v1/train/workouts?status=in_progress\|completed&limit&cursor` | `Page<WorkoutSummary>`, newest first |
+| GET    | `/api/v1/train/workouts/{id}` | `Workout` |
+| PUT    | `/api/v1/train/workouts/{id}` | `WorkoutInput` → `201` created / `200` replaced, returns `Workout` |
+| DELETE | `/api/v1/train/workouts/{id}` | `204` |
 
 ```json
 WorkoutInput {
@@ -282,11 +288,11 @@ Reusable plans with per-set targets; a workout started from a routine carries it
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET    | `/api/v1/routines` | `Routine[]` sorted by name |
-| GET    | `/api/v1/routines/{id}` | `Routine` |
-| POST   | `/api/v1/routines` | `RoutineInput` → `201 Routine` |
-| PUT    | `/api/v1/routines/{id}` | Full replace |
-| DELETE | `/api/v1/routines/{id}` | `204`; past workouts keep their data |
+| GET    | `/api/v1/train/routines` | `Routine[]` sorted by name |
+| GET    | `/api/v1/train/routines/{id}` | `Routine` |
+| POST   | `/api/v1/train/routines` | `RoutineInput` → `201 Routine` |
+| PUT    | `/api/v1/train/routines/{id}` | Full replace |
+| DELETE | `/api/v1/train/routines/{id}` | `204`; past workouts keep their data |
 
 ```json
 RoutineInput {
@@ -304,10 +310,10 @@ Endurance sessions (Strava-style). Client-generated ids, `PUT` upsert.
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET    | `/api/v1/activities?kind=&limit&cursor` | `Page<Activity>`, newest first |
-| GET    | `/api/v1/activities/{id}` | `Activity` |
-| PUT    | `/api/v1/activities/{id}` | `ActivityInput` → `201` / `200` |
-| DELETE | `/api/v1/activities/{id}` | `204` |
+| GET    | `/api/v1/train/activities?kind=&limit&cursor` | `Page<Activity>`, newest first |
+| GET    | `/api/v1/train/activities/{id}` | `Activity` |
+| PUT    | `/api/v1/train/activities/{id}` | `ActivityInput` → `201` / `200` |
+| DELETE | `/api/v1/train/activities/{id}` | `204` |
 
 ```json
 ActivityInput {
@@ -327,10 +333,10 @@ three years.
 
 | Method | Path | Response |
 |--------|------|----------|
-| GET | `/api/v1/stats/overview?from&to&tz` | `{ from, to, current: Totals, previous: Totals, streak_weeks }` — `previous` is the equally long period right before `from` |
-| GET | `/api/v1/stats/timeline?from&to&tz&bucket=week\|month` | `[{ bucket: "2026-09-14", ...Totals }]`, zero-filled |
-| GET | `/api/v1/stats/muscles?from&to&tz` | `[{ muscle, sets, volume_kg }]` by primary muscle |
-| GET | `/api/v1/stats/records` | `[{ exercise_id, exercise_name, tracking, primary_muscle, max_weight_kg, best_e1rm_kg, max_reps, max_duration_seconds, max_distance_m, sessions, last_performed_at }]` |
+| GET | `/api/v1/train/stats/overview?from&to&tz` | `{ from, to, current: Totals, previous: Totals, streak_weeks }` — `previous` is the equally long period right before `from` |
+| GET | `/api/v1/train/stats/timeline?from&to&tz&bucket=week\|month` | `[{ bucket: "2026-09-14", ...Totals }]`, zero-filled |
+| GET | `/api/v1/train/stats/muscles?from&to&tz` | `[{ muscle, sets, volume_kg }]` by primary muscle |
+| GET | `/api/v1/train/stats/records` | `[{ exercise_id, exercise_name, tracking, primary_muscle, max_weight_kg, best_e1rm_kg, max_reps, max_duration_seconds, max_distance_m, sessions, last_performed_at }]` |
 
 ```json
 Totals { "workouts": 3, "workout_seconds": 11700, "sets": 42, "reps": 380, "volume_kg": 18250.0,
@@ -397,8 +403,8 @@ FeedEntry { "user": PublicUser, "type": "activity", "id": "uuid", "kind": "run",
 | `POST /api/v1/users/login`                  | `POST /api/v1/auth/login` (same `login` + `password` body) |
 | `POST /api/v1/users/renewToken`             | Removed — sessions slide forward on use |
 | `POST /api/v1/users/getAllUsers` (public!)  | `GET /api/v1/users`, admin only |
-| `POST /api/v1/exercises/create`             | `POST /api/v1/exercises` (`ytVideoID` → `video_id`, `muscleGroup[]` → `primary_muscle` + `secondary_muscles`) |
-| `GET /api/v1/exercises/getAll`              | `GET /api/v1/exercises` |
+| `POST /api/v1/train/exercises/create`             | `POST /api/v1/train/exercises` (`ytVideoID` → `video_id`, `muscleGroup[]` → `primary_muscle` + `secondary_muscles`) |
+| `GET /api/v1/train/exercises/getAll`              | `GET /api/v1/train/exercises` |
 | Playlists (model only, never routed)        | Routines |
 | 30-minute JWTs, token also in a cookie      | Opaque bearer sessions stored hashed server-side |
 | Roles `user` / `admin` / `superadmin`       | `user` / `admin` (`superadmin` had no distinct permission) |

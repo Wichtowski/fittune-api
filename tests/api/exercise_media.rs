@@ -40,7 +40,7 @@ async fn catalog_exercises_list_their_photos_and_videos(pool: PgPool) {
 
     let bench = app.catalog_exercise("Barbell Bench Press").await;
     let (status, exercise) = app
-        .get(&format!("/api/v1/exercises/{bench}"), &user.token)
+        .get(&format!("/api/v1/train/exercises/{bench}"), &user.token)
         .await;
     assert_eq!(status, StatusCode::OK);
     let photos = media_of_kind(&exercise, "photo");
@@ -51,7 +51,7 @@ async fn catalog_exercises_list_their_photos_and_videos(pool: PgPool) {
         assert_eq!(
             photo["url"],
             format!(
-                "/api/v1/exercise-media/{}/file",
+                "/api/v1/train/exercise-media/{}/file",
                 photo["id"].as_str().expect("id")
             )
         );
@@ -69,7 +69,7 @@ async fn catalog_exercises_list_their_photos_and_videos(pool: PgPool) {
 
     let curl = app.catalog_exercise("Barbell Curl").await;
     let (_, exercise) = app
-        .get(&format!("/api/v1/exercises/{curl}"), &user.token)
+        .get(&format!("/api/v1/train/exercises/{curl}"), &user.token)
         .await;
     assert_eq!(media_of_kind(&exercise, "video")[0]["provider"], "vimeo");
     assert_eq!(
@@ -78,7 +78,7 @@ async fn catalog_exercises_list_their_photos_and_videos(pool: PgPool) {
         "only YouTube ids fill video_id"
     );
 
-    let (_, list) = app.get("/api/v1/exercises", &user.token).await;
+    let (_, list) = app.get("/api/v1/train/exercises", &user.token).await;
     let listed = list
         .as_array()
         .expect("list")
@@ -87,7 +87,10 @@ async fn catalog_exercises_list_their_photos_and_videos(pool: PgPool) {
         .expect("bench press listed");
     assert_eq!(listed["media"].as_array().map(Vec::len), Some(3));
     let (_, history) = app
-        .get(&format!("/api/v1/exercises/{bench}/history"), &user.token)
+        .get(
+            &format!("/api/v1/train/exercises/{bench}/history"),
+            &user.token,
+        )
         .await;
     assert_eq!(
         history["exercise"]["media"].as_array().map(Vec::len),
@@ -118,7 +121,7 @@ async fn custom_exercise_video_id_round_trips_through_media(pool: PgPool) {
     let user = app.register("videoowner").await;
     let (status, created) = app
         .post(
-            "/api/v1/exercises",
+            "/api/v1/train/exercises",
             Some(&user.token),
             json!({ "name": "Landmine Press", "tracking": "weight_reps",
                     "primary_muscle": "shoulders", "video_id": "dQw4w9WgXcQ" }),
@@ -130,7 +133,10 @@ async fn custom_exercise_video_id_round_trips_through_media(pool: PgPool) {
         media_of_kind(&created, "video")[0]["external_id"],
         "dQw4w9WgXcQ"
     );
-    let uri = format!("/api/v1/exercises/{}", created["id"].as_str().expect("id"));
+    let uri = format!(
+        "/api/v1/train/exercises/{}",
+        created["id"].as_str().expect("id")
+    );
 
     let (_, updated) = app
         .put(
@@ -165,7 +171,7 @@ async fn catalog_photo_files_are_public_and_cacheable(pool: PgPool) {
     let user = app.register("photoviewer").await;
     let bench = app.catalog_exercise("Barbell Bench Press").await;
     let (_, exercise) = app
-        .get(&format!("/api/v1/exercises/{bench}"), &user.token)
+        .get(&format!("/api/v1/train/exercises/{bench}"), &user.token)
         .await;
     let photo = media_of_kind(&exercise, "photo")[0].clone();
     let url = photo["url"].as_str().expect("url");
@@ -197,7 +203,7 @@ async fn catalog_photo_files_are_public_and_cacheable(pool: PgPool) {
         let (status, _, _) = app
             .raw(
                 Method::GET,
-                &format!("/api/v1/exercise-media/{id}/file"),
+                &format!("/api/v1/train/exercise-media/{id}/file"),
                 None,
                 None,
                 vec![],
@@ -214,7 +220,7 @@ async fn custom_exercise_photos_are_never_public(pool: PgPool) {
     let user = app.register("privatephotos").await;
     let (_, created) = app
         .post(
-            "/api/v1/exercises",
+            "/api/v1/train/exercises",
             Some(&user.token),
             json!({ "name": "Secret Press", "tracking": "weight_reps", "primary_muscle": "chest" }),
         )
@@ -238,7 +244,7 @@ async fn custom_exercise_photos_are_never_public(pool: PgPool) {
     let (status, _, _) = app
         .raw(
             Method::GET,
-            &format!("/api/v1/exercise-media/{media_id}/file"),
+            &format!("/api/v1/train/exercise-media/{media_id}/file"),
             None,
             None,
             vec![],

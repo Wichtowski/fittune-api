@@ -59,15 +59,15 @@ async fn seeds_a_fresh_database_and_reruns_without_duplicates(pool: PgPool) {
 
     let app = TestApp::new(pool.clone());
     let demo = sign_in(&app, "demo").await;
-    let (_, records) = app.get("/api/v1/stats/records", &demo).await;
+    let (_, records) = app.get("/api/v1/train/stats/records", &demo).await;
     assert!(!records.as_array().expect("records").is_empty());
     let (_, history) = app
-        .get("/api/v1/workouts?status=completed&limit=100", &demo)
+        .get("/api/v1/train/workouts?status=completed&limit=100", &demo)
         .await;
     assert!(items(&history).len() > 40);
 
     let newbie = sign_in(&app, "newbie").await;
-    let (_, empty) = app.get("/api/v1/workouts", &newbie).await;
+    let (_, empty) = app.get("/api/v1/train/workouts", &newbie).await;
     assert!(items(&empty).is_empty());
 
     let admin = sign_in(&app, "admin").await;
@@ -85,10 +85,13 @@ async fn seeds_a_fresh_database_and_reruns_without_duplicates(pool: PgPool) {
     // Continuing the in-progress workout in the app makes it newer than the fixture
     let casual = sign_in(&app, "casual").await;
     let (_, open) = app
-        .get("/api/v1/workouts?status=in_progress", &casual)
+        .get("/api/v1/train/workouts?status=in_progress", &casual)
         .await;
     let open = &items(&open)[0];
-    let uri = format!("/api/v1/workouts/{}", open["id"].as_str().expect("id"));
+    let uri = format!(
+        "/api/v1/train/workouts/{}",
+        open["id"].as_str().expect("id")
+    );
     let (_, mut workout) = app.get(&uri, &casual).await;
     workout["revision"] = json!(5);
     workout["place_version_id"] = workout["place"]["version_id"].clone();
@@ -111,7 +114,7 @@ async fn reset_removes_only_fixture_accounts(pool: PgPool) {
     let someone = app.register("someone").await;
     let (status, _) = app
         .put(
-            &format!("/api/v1/activities/{}", crate::common::uuid()),
+            &format!("/api/v1/train/activities/{}", crate::common::uuid()),
             &someone.token,
             json!({ "kind": "run", "title": "Mine", "started_at": now, "duration_seconds": 600 }),
         )

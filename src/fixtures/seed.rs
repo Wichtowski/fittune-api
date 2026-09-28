@@ -101,7 +101,7 @@ async fn seed_account(
     for workout in plan::workouts(account.kind, &clock) {
         let body = workout_body(account, &workout, &ids)?;
         let id = fixture_id(&format!("{}/workout/{}", account.username, workout.key));
-        let uri = format!("/api/v1/workouts/{id}");
+        let uri = format!("/api/v1/train/workouts/{id}");
         let (status, response) = api.call(Method::PUT, &uri, token, Some(&body)).await?;
         match status {
             StatusCode::OK | StatusCode::CREATED => summary.workouts += 1,
@@ -115,7 +115,7 @@ async fn seed_account(
 
     for activity in plan::activities(account.kind, &clock) {
         let id = fixture_id(&format!("{}/activity/{}", account.username, activity.key));
-        let uri = format!("/api/v1/activities/{id}");
+        let uri = format!("/api/v1/train/activities/{id}");
         api.expect(Method::PUT, &uri, token, Some(&activity.body), SAVED)
             .await?;
         summary.activities += 1;
@@ -353,25 +353,27 @@ fn by_name(items: &[Value], keep: impl Fn(&Value) -> bool) -> Result<HashMap<Str
 
 /// The catalog and the account's custom exercises.
 async fn exercise_ids(api: &Api, token: Option<&str>) -> Result<HashMap<String, String>> {
-    by_name(&list(api, token, "/api/v1/exercises").await?, |_| true)
+    by_name(&list(api, token, "/api/v1/train/exercises").await?, |_| {
+        true
+    })
 }
 
 /// Custom exercise ids come from the server, so an existing one with the same name is updated.
 async fn save_custom_exercises(api: &Api, token: Option<&str>, bodies: Vec<Value>) -> Result<()> {
-    let existing = by_name(&list(api, token, "/api/v1/exercises").await?, |e| {
+    let existing = by_name(&list(api, token, "/api/v1/train/exercises").await?, |e| {
         e["is_custom"] == Value::Bool(true)
     })?;
     for body in bodies {
         match existing.get(&text(&body, "/name")?.to_lowercase()) {
             Some(id) => {
-                let uri = format!("/api/v1/exercises/{id}");
+                let uri = format!("/api/v1/train/exercises/{id}");
                 api.expect(Method::PUT, &uri, token, Some(&body), OK)
                     .await?
             }
             None => {
                 api.expect(
                     Method::POST,
-                    "/api/v1/exercises",
+                    "/api/v1/train/exercises",
                     token,
                     Some(&body),
                     CREATED,
@@ -393,7 +395,7 @@ async fn save_places(
     for place in plan::places(account.kind) {
         let id = fixture_id(&format!("{}/place/{}", account.username, place.key));
         let body = json!({ "name": place.name, "kind": place.kind, "equipment": place.equipment });
-        let uri = format!("/api/v1/places/{id}");
+        let uri = format!("/api/v1/train/places/{id}");
         let (status, saved) = api.call(Method::PUT, &uri, token, Some(&body)).await?;
         match status {
             StatusCode::OK | StatusCode::CREATED => {
@@ -416,7 +418,7 @@ async fn save_routines(
     token: Option<&str>,
     exercises: &HashMap<String, String>,
 ) -> Result<HashMap<&'static str, String>> {
-    let existing = by_name(&list(api, token, "/api/v1/routines").await?, |_| true)?;
+    let existing = by_name(&list(api, token, "/api/v1/train/routines").await?, |_| true)?;
     let mut ids = HashMap::new();
     for template in plan::routines(account.kind) {
         let routine_exercises = template
@@ -437,14 +439,14 @@ async fn save_routines(
         });
         let (_, saved) = match existing.get(&template.routine.to_lowercase()) {
             Some(id) => {
-                let uri = format!("/api/v1/routines/{id}");
+                let uri = format!("/api/v1/train/routines/{id}");
                 api.expect(Method::PUT, &uri, token, Some(&body), OK)
                     .await?
             }
             None => {
                 api.expect(
                     Method::POST,
-                    "/api/v1/routines",
+                    "/api/v1/train/routines",
                     token,
                     Some(&body),
                     CREATED,

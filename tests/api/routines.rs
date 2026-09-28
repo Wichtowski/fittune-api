@@ -16,7 +16,7 @@ async fn routine_crud_round_trip(pool: PgPool) {
 
     let (status, routine) = app
         .post(
-            "/api/v1/routines",
+            "/api/v1/train/routines",
             Some(&user.token),
             json!({
                 "name": "Leg Day",
@@ -39,7 +39,7 @@ async fn routine_crud_round_trip(pool: PgPool) {
     assert_eq!(routine["exercises"][1]["tracking"], "duration");
     assert!(routine["last_performed_at"].is_null());
     let id = routine["id"].as_str().expect("id");
-    let uri = format!("/api/v1/routines/{id}");
+    let uri = format!("/api/v1/train/routines/{id}");
 
     let (status, updated) = app
         .put(
@@ -61,13 +61,13 @@ async fn routine_crud_round_trip(pool: PgPool) {
     );
     session["routine_id"] = json!(id);
     app.put(
-        &format!("/api/v1/workouts/{}", uuid()),
+        &format!("/api/v1/train/workouts/{}", uuid()),
         &user.token,
         session,
     )
     .await;
 
-    let (_, list) = app.get("/api/v1/routines", &user.token).await;
+    let (_, list) = app.get("/api/v1/train/routines", &user.token).await;
     assert_eq!(list[0]["last_performed_at"], "2026-09-22T07:00:00Z");
 
     assert_eq!(
@@ -84,12 +84,15 @@ async fn routines_are_private(pool: PgPool) {
     let other = app.register("other").await;
     let (_, routine) = app
         .post(
-            "/api/v1/routines",
+            "/api/v1/train/routines",
             Some(&owner.token),
             json!({ "name": "Mine" }),
         )
         .await;
-    let uri = format!("/api/v1/routines/{}", routine["id"].as_str().expect("id"));
+    let uri = format!(
+        "/api/v1/train/routines/{}",
+        routine["id"].as_str().expect("id")
+    );
 
     assert_eq!(app.get(&uri, &other.token).await.0, StatusCode::NOT_FOUND);
     assert_eq!(
@@ -102,7 +105,7 @@ async fn routines_are_private(pool: PgPool) {
         app.delete(&uri, &other.token).await.0,
         StatusCode::NOT_FOUND
     );
-    let (_, list) = app.get("/api/v1/routines", &other.token).await;
+    let (_, list) = app.get("/api/v1/train/routines", &other.token).await;
     assert_eq!(list, json!([]));
 }
 
@@ -113,7 +116,7 @@ async fn routines_validate_their_contents(pool: PgPool) {
 
     let (status, body) = app
         .post(
-            "/api/v1/routines",
+            "/api/v1/train/routines",
             Some(&user.token),
             json!({ "name": " ", "exercises": [{ "exercise_id": uuid() }] }),
         )
@@ -123,7 +126,7 @@ async fn routines_validate_their_contents(pool: PgPool) {
 
     let (status, body) = app
         .post(
-            "/api/v1/routines",
+            "/api/v1/train/routines",
             Some(&user.token),
             json!({ "name": "Ghost", "exercises": [{ "exercise_id": uuid() }] }),
         )
