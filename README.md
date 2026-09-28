@@ -125,8 +125,10 @@ An integration test seeds a fresh `sqlx::test` database twice and resets it, so 
 
 ## Deployment
 
-Deployment follows the EchoTrade VPS pattern: the static frontend is deployed separately, and this
-repository ships a Docker Compose stack to the VPS over SSH.
+The static frontend is deployed separately. For this API, GitHub Actions builds the Docker image,
+pushes it to GHCR as `ghcr.io/wichtowski/fittune-api:<release tag>`, and runs the Compose stack on
+the VPS over SSH. The VPS never builds anything and holds no source code: `DEPLOY_PATH` contains
+only `docker-compose.prod.yml`, the `Makefile` (for the `prod-*` targets) and `.env`.
 
 - `api-fittune.oskarwichtowski.com` → `fittune-api:4733`, routed by the global platform edge
 - Nothing in this stack publishes host ports. `fittune-api` sits on the external `fittune_edge_net`
@@ -141,12 +143,14 @@ GitHub Actions:
 | `ci.yml` | PRs, pushes to `main` | fmt, clippy, unit + integration tests against Postgres |
 | `create-release-tag.yml` | merge to `main` / manual | creates the next `x.y.z` tag |
 | `deploy-release.yml` | manual, on a tag | validates the tag, then runs `deploy-backend.yml` |
-| `deploy-backend.yml` | reusable / manual | packages the repo, copies it and `.env` to the VPS, `docker compose up -d --build --wait` |
+| `deploy-backend.yml` | reusable / manual | validates the Compose config, builds and pushes the image to GHCR, copies the Compose file, `Makefile` and `.env` to the VPS, pulls the image and runs `docker compose up -d --wait` |
 | `backend-control.yml` | manual | `start` / `stop` / `restart` the API container (Postgres keeps running) |
 
 Required secrets (same names as EchoTrade): `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`,
 `DEPLOY_SSH_PASSPHRASE`, `DEPLOY_PATH` (e.g. `/opt/fittune`), and `ENV_PRODUCTION` — the
-production `.env` body. Repository variable: `DEPLOY_ARCHIVE` (e.g. `fittune-api.tar.gz`).
+production `.env` body. The GHCR push and the VPS pull use the workflow's own `GITHUB_TOKEN`, so
+no registry secret is needed; the VPS login is removed again when the deploy ends. The image package
+is private and linked to this repository.
 
 Add `FITTUNE_PHOTOS_BUCKET`, `FITTUNE_PHOTOS_ACCESS_KEY`, and
 `FITTUNE_PHOTOS_SECRET_KEY` to `ENV_PRODUCTION` before deploying this release. RustFS is
@@ -173,7 +177,7 @@ FITTUNE_CORS_ORIGINS=https://fittune.oskarwichtowski.com
 ```
 
 `FITTUNE_DATABASE_URL` is derived from the `POSTGRES_*` values in `docker-compose.prod.yml`, and
-`FITTUNE_APP_VERSION` is injected from the release tag.
+`FITTUNE_APP_VERSION` is injected from the release tag and also selects the image to run.
 
 Useful commands on the VPS (from `DEPLOY_PATH`): `make prod-ps`, `make prod-logs`.
 

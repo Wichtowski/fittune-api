@@ -26,8 +26,8 @@ services:
         max-file: "3"
 
   fittune-api:
-    build:
-      context: .
+    # Built and pushed by the deploy workflow; FITTUNE_APP_VERSION is the release tag
+    image: ghcr.io/wichtowski/fittune-api:${FITTUNE_APP_VERSION:?Set FITTUNE_APP_VERSION to the release tag}
     restart: unless-stopped
     env_file:
       - .env
