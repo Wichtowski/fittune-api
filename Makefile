@@ -6,7 +6,7 @@ COMPOSE_PROD = docker compose --env-file .env -f docker-compose.prod.yml
 
 help:
 	@echo "fittune-api targets:"
-	@echo "  up              — start local Postgres (docker compose)"
+	@echo "  up              — start local Postgres and RustFS (docker compose)"
 	@echo "  down            — stop local infrastructure"
 	@echo "  run             — run the API against .env (applies migrations on start)"
 	@echo "  check           — cargo check"
@@ -21,7 +21,7 @@ help:
 	@echo "  prod-logs       — (VPS) follow production API logs"
 
 up:
-	docker compose up -d fittune-postgres
+	docker compose up -d fittune-postgres fittune-photos-bucket
 	@echo "Postgres: localhost:$${FITTUNE_POSTGRES_PORT:-5432} (db/user/pass: fittune)"
 
 down:

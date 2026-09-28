@@ -29,6 +29,10 @@ pub enum ApiError {
     NotFound(&'static str),
     #[error("{0}")]
     Conflict(String),
+    #[error("photo storage is unavailable")]
+    StorageUnavailable,
+    #[error("photo is too large")]
+    PayloadTooLarge,
     #[error("database error")]
     Database(#[from] sqlx::Error),
     #[error("internal error")]
@@ -61,6 +65,8 @@ impl ApiError {
             Self::Forbidden => (StatusCode::FORBIDDEN, "forbidden"),
             Self::NotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
             Self::Conflict(_) => (StatusCode::CONFLICT, "conflict"),
+            Self::StorageUnavailable => (StatusCode::SERVICE_UNAVAILABLE, "storage_unavailable"),
+            Self::PayloadTooLarge => (StatusCode::PAYLOAD_TOO_LARGE, "payload_too_large"),
             Self::Database(_) | Self::Internal(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "internal_error")
             }

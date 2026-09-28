@@ -12,6 +12,15 @@ pub struct Config {
     pub session_ttl: Duration,
     pub app_version: String,
     pub log_format: LogFormat,
+    pub photo_storage: Option<PhotoStorageConfig>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PhotoStorageConfig {
+    pub endpoint: String,
+    pub bucket: String,
+    pub access_key: String,
+    pub secret_key: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,6 +55,24 @@ impl Config {
             other => bail!("FITTUNE_LOG_FORMAT must be `pretty` or `json`, got `{other}`"),
         };
 
+        let photo_storage = match env::var("FITTUNE_PHOTOS_ENDPOINT")
+            .ok()
+            .filter(|s| !s.is_empty())
+        {
+            Some(endpoint) => Some(PhotoStorageConfig {
+                endpoint,
+                bucket: env::var("FITTUNE_PHOTOS_BUCKET")
+                    .context("FITTUNE_PHOTOS_BUCKET must be set when photo storage is enabled")?,
+                access_key: env::var("FITTUNE_PHOTOS_ACCESS_KEY").context(
+                    "FITTUNE_PHOTOS_ACCESS_KEY must be set when photo storage is enabled",
+                )?,
+                secret_key: env::var("FITTUNE_PHOTOS_SECRET_KEY").context(
+                    "FITTUNE_PHOTOS_SECRET_KEY must be set when photo storage is enabled",
+                )?,
+            }),
+            None => None,
+        };
+
         Ok(Self {
             database_url,
             db_max_connections,
@@ -54,6 +81,7 @@ impl Config {
             session_ttl: Duration::from_secs(session_ttl_hours * 60 * 60),
             app_version: var_or("FITTUNE_APP_VERSION", "dev"),
             log_format,
+            photo_storage,
         })
     }
 }

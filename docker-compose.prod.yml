@@ -36,10 +36,13 @@ services:
       FITTUNE_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@fittune-postgres:5432/${POSTGRES_DB}
       FITTUNE_BIND_ADDR: 0.0.0.0:4733
       FITTUNE_LOG_FORMAT: json
+      FITTUNE_PHOTOS_ENDPOINT: http://fittune-rustfs:9000
     command: ["serve"]
     depends_on:
       fittune-postgres:
         condition: service_healthy
+      fittune-photos-bucket:
+        condition: service_completed_successfully
     expose:
       - "4733"
     security_opt:
@@ -62,8 +65,48 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  fittune-rustfs:
+    image: rustfs/rustfs:1.0.0-rc.6
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${FITTUNE_PHOTOS_ACCESS_KEY:?Set FITTUNE_PHOTOS_ACCESS_KEY in ENV_PRODUCTION}
+      RUSTFS_SECRET_KEY: ${FITTUNE_PHOTOS_SECRET_KEY:?Set FITTUNE_PHOTOS_SECRET_KEY in ENV_PRODUCTION}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_CONSOLE_ENABLE: "false"
+    volumes:
+      - rustfsdata:/data
+    expose:
+      - "9000"
+    networks:
+      - data_net
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  fittune-photos-bucket:
+    image: rustfs/rc:latest
+    depends_on:
+      fittune-rustfs:
+        condition: service_healthy
+    environment:
+      ACCESS_KEY: ${FITTUNE_PHOTOS_ACCESS_KEY:?Set FITTUNE_PHOTOS_ACCESS_KEY in ENV_PRODUCTION}
+      SECRET_KEY: ${FITTUNE_PHOTOS_SECRET_KEY:?Set FITTUNE_PHOTOS_SECRET_KEY in ENV_PRODUCTION}
+      BUCKET: ${FITTUNE_PHOTOS_BUCKET:?Set FITTUNE_PHOTOS_BUCKET in ENV_PRODUCTION}
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["/usr/bin/rc alias set photos http://fittune-rustfs:9000 \"$$ACCESS_KEY\" \"$$SECRET_KEY\" && (/usr/bin/rc ls photos/\"$$BUCKET\" >/dev/null 2>&1 || /usr/bin/rc mb photos/\"$$BUCKET\")"]
+    networks:
+      - data_net
+
 volumes:
   pgdata:
+  rustfsdata:
 
 networks:
   # Created once on the VPS and shared with the platform-edge Caddy

@@ -134,6 +134,7 @@ async fn delete_me(
     if !password::verify(request.password, current_hash).await? {
         return Err(ApiError::validation("password", "Password is incorrect"));
     }
+    crate::photos::delete_all_for_user(&state, auth.user_id()).await?;
     repo::delete(&state.db, auth.user_id()).await?;
     tracing::info!(user_id = %auth.user_id(), "account deleted");
     Ok(StatusCode::NO_CONTENT)

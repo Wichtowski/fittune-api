@@ -10,7 +10,7 @@ use fittune_api::{
     AppState,
     auth::session,
     config::{Config, LogFormat},
-    db, router,
+    db, photos, router,
     users::{self, model::Role},
 };
 use tokio::net::TcpListener;
@@ -56,9 +56,14 @@ async fn serve(config: Config) -> Result<()> {
         .with_context(|| format!("failed to bind {}", config.bind_addr))?;
     tracing::info!(addr = %config.bind_addr, version = %config.app_version, "fittune-api listening");
 
+    let photo_store = config
+        .photo_storage
+        .as_ref()
+        .map(|storage| Arc::new(photos::S3PhotoStore::new(storage)) as Arc<dyn photos::PhotoStore>);
     let app = router(AppState {
         db: pool.clone(),
         config: Arc::new(config),
+        photos: photo_store,
     });
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())

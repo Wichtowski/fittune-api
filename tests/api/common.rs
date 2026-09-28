@@ -8,6 +8,7 @@ use axum::{
 use fittune_api::{
     AppState,
     config::{Config, LogFormat},
+    photos::PhotoStore,
     router,
 };
 use http_body_util::BodyExt;
@@ -29,6 +30,10 @@ pub struct TestUser {
 
 impl TestApp {
     pub fn new(pool: PgPool) -> Self {
+        Self::with_photos(pool, None)
+    }
+
+    pub fn with_photos(pool: PgPool, photos: Option<Arc<dyn PhotoStore>>) -> Self {
         let config = Config {
             database_url: String::new(),
             db_max_connections: 5,
@@ -37,12 +42,48 @@ impl TestApp {
             session_ttl: Duration::from_secs(3600),
             app_version: "test".into(),
             log_format: LogFormat::Pretty,
+            photo_storage: None,
         };
         let router = router(AppState {
             db: pool.clone(),
             config: Arc::new(config),
+            photos,
         });
         Self { router, pool }
+    }
+
+    pub async fn raw(
+        &self,
+        method: Method,
+        uri: &str,
+        token: Option<&str>,
+        content_type: Option<&str>,
+        bytes: Vec<u8>,
+    ) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
+        let mut builder = Request::builder().method(method).uri(uri);
+        if let Some(token) = token {
+            builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
+        }
+        if let Some(content_type) = content_type {
+            builder = builder.header(header::CONTENT_TYPE, content_type);
+        }
+        let request = builder.body(Body::from(bytes)).expect("valid request");
+        let response = self
+            .router
+            .clone()
+            .oneshot(request)
+            .await
+            .expect("infallible router");
+        let status = response.status();
+        let headers = response.headers().clone();
+        let bytes = response
+            .into_body()
+            .collect()
+            .await
+            .expect("readable body")
+            .to_bytes()
+            .to_vec();
+        (status, headers, bytes)
     }
 
     pub async fn request(

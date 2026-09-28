@@ -20,8 +20,8 @@ use tower_http::{
 use tracing::Level;
 
 use crate::{
-    activities, auth, config::Config, error::ApiError, exercises, places, routines, stats, users,
-    workouts,
+    activities, auth, config::Config, error::ApiError, exercises, photos, places, routines, stats,
+    users, workouts,
 };
 
 const REQUEST_ID: HeaderName = HeaderName::from_static("x-request-id");
@@ -31,6 +31,7 @@ const MAX_BODY_BYTES: usize = 1024 * 1024;
 pub struct AppState {
     pub db: PgPool,
     pub config: Arc<Config>,
+    pub photos: Option<Arc<dyn photos::PhotoStore>>,
 }
 
 pub fn router(state: AppState) -> Router {
@@ -41,6 +42,7 @@ pub fn router(state: AppState) -> Router {
         .merge(routines::router())
         .merge(places::router())
         .merge(workouts::router())
+        .merge(photos::router())
         .merge(activities::router())
         .merge(stats::router())
         .fallback(|| async { ApiError::NotFound("route") });
