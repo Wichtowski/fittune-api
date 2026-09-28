@@ -1,6 +1,7 @@
 pub mod password;
 mod routes;
 pub mod session;
+pub mod signup;
 
 use axum::{
     extract::FromRequestParts,
