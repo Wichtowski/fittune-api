@@ -69,6 +69,42 @@ make create-admin USERNAME=root EMAIL=root@example.com   # new admin, prompts fo
 make grant-admin LOGIN=oskyy                             # promote an existing account
 ```
 
+### Development fixtures
+
+One command gives a local database with realistic data, so the app does not start from an empty account:
+
+```bash
+make up && make seed   # creates fittune_dev, applies migrations, seeds it
+make run-fixtures      # API on :4733 against fittune_dev
+```
+
+Fixtures go into their own database, `FITTUNE_FIXTURES_DATABASE_URL` (`fittune_dev` in `.env.example`), never the one `make run` uses and never the `DATABASE_URL` that tests create their databases from.
+The command only exists in builds with the `dev-fixtures` cargo feature, so the release binary and the production image cannot seed anything.
+It also refuses to run unless `FITTUNE_ENV=development`, the database is on localhost and its name ends in `_dev`.
+Nothing seeds automatically: not migrations, not startup, not deployment.
+
+Every account uses the dev-only password `FitTune#Dev1`:
+
+| Account | What it shows |
+|---------|---------------|
+| `admin@fittune.test` | Admin screens: users, and invites that are active, used, expired and revoked |
+| `demo@fittune.test` | 12 weeks of push/pull/legs plus a session earlier today, with progressive overload, warm-up, drop and failure sets, a deload week, records, 4 routines, a gym and a home place, custom exercises (weight, reps and duration tracking), runs, rides, swims and hikes |
+| `casual@fittune.test` | lb/mi units, 6 light weeks with cardio finishers, and a workout in progress "on another device" |
+| `newbie@fittune.test` | A new account with no places, routines or history |
+
+The data goes through the real HTTP handlers with real sessions, so it passes the same validation and authorization as the app.
+The admin is created like `create-admin`, and the other accounts sign up with invites it issues.
+Only the expired invite is back-dated in SQL, because the API only takes expiry in days from now.
+
+- **Rerunning** (`make seed`) updates the fixtures in place without duplicating anything.
+  Workouts, activities and places have ids derived from fixed keys; routines and custom exercises are matched by name.
+  A fixture workout you changed in the app has a newer revision and is kept, just as the API treats any other device.
+- **Dates** count back from today, so recent-history screens stay populated; `make seed BASE_DATE=2026-09-01` (or `FITTUNE_FIXTURES_BASE_DATE`) pins them.
+- **`make seed-reset`** deletes only the fixture accounts (through account deletion, so their data and photos go too), then seeds again. Other accounts in the database are untouched.
+- **`make reset`** drops and recreates the whole fixture database, migrates and seeds it.
+
+An integration test seeds a fresh `sqlx::test` database twice and resets it, so the fixtures fail in CI rather than on a laptop when the schema or an endpoint changes.
+
 ## Configuration
 
 | Variable | Default | Purpose |

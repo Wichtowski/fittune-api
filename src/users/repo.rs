@@ -74,10 +74,16 @@ pub async fn set_role(db: &PgPool, login: &str, role: Role) -> sqlx::Result<Opti
     .await
 }
 
-pub async fn delete(db: impl PgExecutor<'_>, id: Uuid) -> sqlx::Result<()> {
-    sqlx::query("DELETE FROM users WHERE id = $1")
-        .bind(id)
-        .execute(db)
-        .await?;
-    Ok(())
+/// Deletes the account and everything it owns. Workouts and routines go first, because they
+/// can reference the user's custom exercises, which the account's own cascade removes
+pub async fn delete(db: &PgPool, id: Uuid) -> sqlx::Result<()> {
+    let mut tx = db.begin().await?;
+    for statement in [
+        "DELETE FROM workouts WHERE user_id = $1",
+        "DELETE FROM routines WHERE user_id = $1",
+        "DELETE FROM users WHERE id = $1",
+    ] {
+        sqlx::query(statement).bind(id).execute(&mut *tx).await?;
+    }
+    tx.commit().await
 }

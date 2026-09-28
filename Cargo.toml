@@ -31,6 +31,10 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 uuid = { version = "1.26.1", features = ["v4", "serde"] }
 
+[features]
+# `seed-dev` local fixtures. Off by default, so release builds and the production image never contain them
+dev-fixtures = ["tower/util"]
+
 [dev-dependencies]
 http-body-util = "0.1.5"
 tower = { version = "0.5.3", features = ["util"] }
