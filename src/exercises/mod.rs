@@ -1,4 +1,5 @@
 mod history;
+pub mod media;
 pub mod model;
 pub mod repo;
 mod routes;

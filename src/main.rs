@@ -14,6 +14,7 @@ use fittune_api::{
     config::{Config, LogFormat},
     db,
     error::ApiError,
+    exercises::media,
     router,
     users::{self, model::Role},
 };
@@ -62,7 +63,9 @@ async fn serve(config: Config) -> Result<()> {
         .with_context(|| format!("failed to bind {}", config.bind_addr))?;
     tracing::info!(addr = %config.bind_addr, version = %config.app_version, "fittune-api listening");
 
-    let app = router(AppState::new(pool.clone(), config));
+    let state = AppState::new(pool.clone(), config);
+    spawn_catalog_media_backfill(&state);
+    let app = router(state);
     // Connection info gives rate limiting a client address when no proxy header is configured
     axum::serve(
         listener,
@@ -102,6 +105,30 @@ fn spawn_session_janitor(pool: sqlx::PgPool) {
                 Ok(purged) => tracing::info!(purged, "purged expired sessions"),
                 Err(err) => tracing::warn!(error = %err, "failed to purge expired sessions"),
             }
+        }
+    });
+}
+
+/// Copies catalog photos missing from storage once per start, without delaying requests.
+fn spawn_catalog_media_backfill(state: &AppState) {
+    let Some(store) = state.photos.clone() else {
+        tracing::info!("photo storage is not configured, skipping the catalog photo backfill");
+        return;
+    };
+    let db = state.db.clone();
+    tokio::spawn(async move {
+        let result = match media::HttpFetch::new() {
+            Ok(fetch) => media::backfill(&db, store.as_ref(), &fetch).await,
+            Err(err) => Err(err),
+        };
+        match result {
+            Ok(summary) => tracing::info!(
+                stored = summary.stored,
+                present = summary.present,
+                failed = summary.failed,
+                "catalog photo backfill finished"
+            ),
+            Err(err) => tracing::warn!(error = format!("{err:#}"), "catalog photo backfill failed"),
         }
     });
 }
