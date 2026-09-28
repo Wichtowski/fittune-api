@@ -1,14 +1,17 @@
 use chrono::{DateTime, Utc};
-use sqlx::{PgExecutor, PgPool};
+use sqlx::{PgConnection, PgExecutor, PgPool};
 use uuid::Uuid;
 
-use super::model::{Equipment, Exercise, ExerciseDraft, Muscle};
+use super::{
+    media,
+    model::{Equipment, Exercise, ExerciseDraft, Muscle},
+};
 use crate::workouts::model::SetKind;
 
 macro_rules! exercise_columns {
     () => {
         "id, owner_id, name, tracking, primary_muscle, secondary_muscles, equipment, requires, difficulty, \
-         video_id, instructions, owner_id IS NOT NULL AS is_custom, archived_at, created_at, updated_at"
+         instructions, owner_id IS NOT NULL AS is_custom, archived_at, created_at, updated_at"
     };
 }
 
@@ -25,7 +28,7 @@ pub async fn list(
     user_id: Uuid,
     filter: &ExerciseFilter,
 ) -> sqlx::Result<Vec<Exercise>> {
-    sqlx::query_as(concat!(
+    let mut exercises: Vec<Exercise> = sqlx::query_as(concat!(
         "SELECT ",
         exercise_columns!(),
         " FROM exercises
@@ -41,16 +44,14 @@ pub async fn list(
     .bind(filter.muscle)
     .bind(filter.equipment)
     .fetch_all(db)
-    .await
+    .await?;
+    media::attach(db, &mut exercises).await?;
+    Ok(exercises)
 }
 
 /// Any exercise visible to `user_id`, including archived ones (history still references them).
-pub async fn find_visible(
-    db: impl PgExecutor<'_>,
-    user_id: Uuid,
-    id: Uuid,
-) -> sqlx::Result<Option<Exercise>> {
-    sqlx::query_as(concat!(
+pub async fn find_visible(db: &PgPool, user_id: Uuid, id: Uuid) -> sqlx::Result<Option<Exercise>> {
+    let mut exercise: Option<Exercise> = sqlx::query_as(concat!(
         "SELECT ",
         exercise_columns!(),
         " FROM exercises WHERE id = $1 AND (owner_id IS NULL OR owner_id = $2)"
@@ -58,7 +59,9 @@ pub async fn find_visible(
     .bind(id)
     .bind(user_id)
     .fetch_optional(db)
-    .await
+    .await?;
+    media::attach(db, exercise.as_mut_slice()).await?;
+    Ok(exercise)
 }
 
 /// Whether every id in `ids` refers to an exercise visible to `user_id` (archived ones included).
@@ -83,15 +86,16 @@ pub async fn all_visible(
     Ok(usize::try_from(visible).ok() == Some(ids.len()))
 }
 
+/// Media are written on the same connection, so pass a transaction.
 pub async fn insert(
-    db: &PgPool,
+    db: &mut PgConnection,
     owner_id: Option<Uuid>,
     draft: &ExerciseDraft,
 ) -> sqlx::Result<Exercise> {
-    sqlx::query_as(concat!(
+    let exercise: Exercise = sqlx::query_as(concat!(
         "INSERT INTO exercises (id, owner_id, name, tracking, primary_muscle, secondary_muscles,
-                                equipment, requires, difficulty, video_id, instructions)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                                equipment, requires, difficulty, instructions)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING ",
         exercise_columns!()
     ))
@@ -104,16 +108,21 @@ pub async fn insert(
     .bind(draft.equipment)
     .bind(&draft.requires)
     .bind(draft.difficulty)
-    .bind(&draft.video_id)
     .bind(&draft.instructions)
-    .fetch_one(db)
-    .await
+    .fetch_one(&mut *db)
+    .await?;
+    with_video(db, exercise, draft).await
 }
 
-pub async fn update(db: &PgPool, id: Uuid, draft: &ExerciseDraft) -> sqlx::Result<Exercise> {
-    sqlx::query_as(concat!(
+/// Media are written on the same connection, so pass a transaction.
+pub async fn update(
+    db: &mut PgConnection,
+    id: Uuid,
+    draft: &ExerciseDraft,
+) -> sqlx::Result<Exercise> {
+    let exercise: Exercise = sqlx::query_as(concat!(
         "UPDATE exercises SET name = $2, tracking = $3, primary_muscle = $4, secondary_muscles = $5,
-                equipment = $6, requires = $7, difficulty = $8, video_id = $9, instructions = $10,
+                equipment = $6, requires = $7, difficulty = $8, instructions = $9,
                 updated_at = now()
          WHERE id = $1
          RETURNING ",
@@ -127,10 +136,21 @@ pub async fn update(db: &PgPool, id: Uuid, draft: &ExerciseDraft) -> sqlx::Resul
     .bind(draft.equipment)
     .bind(&draft.requires)
     .bind(draft.difficulty)
-    .bind(&draft.video_id)
     .bind(&draft.instructions)
-    .fetch_one(db)
-    .await
+    .fetch_one(&mut *db)
+    .await?;
+    with_video(db, exercise, draft).await
+}
+
+/// Stores the draft's YouTube video and loads the exercise's media
+async fn with_video(
+    db: &mut PgConnection,
+    mut exercise: Exercise,
+    draft: &ExerciseDraft,
+) -> sqlx::Result<Exercise> {
+    media::set_youtube_video(&mut *db, exercise.id, draft.video_id.as_deref()).await?;
+    media::attach(db, std::slice::from_mut(&mut exercise)).await?;
+    Ok(exercise)
 }
 
 pub async fn archive(db: &PgPool, id: Uuid) -> sqlx::Result<()> {

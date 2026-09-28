@@ -35,6 +35,7 @@ const MAX_PIXELS: u64 = 12_000_000;
 #[async_trait]
 pub trait PhotoStore: Send + Sync {
     async fn put(&self, key: &str, bytes: Vec<u8>) -> Result<()>;
+    async fn exists(&self, key: &str) -> Result<bool>;
     async fn get(&self, key: &str) -> Result<Vec<u8>>;
     async fn delete(&self, key: &str) -> Result<()>;
 }
@@ -80,6 +81,21 @@ impl PhotoStore for S3PhotoStore {
             .await
             .context("RustFS put_object failed")?;
         Ok(())
+    }
+
+    async fn exists(&self, key: &str) -> Result<bool> {
+        match self
+            .client
+            .head_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
+            .await
+        {
+            Ok(_) => Ok(true),
+            Err(err) if err.as_service_error().is_some_and(|err| err.is_not_found()) => Ok(false),
+            Err(err) => Err(anyhow::Error::new(err).context("RustFS head_object failed")),
+        }
     }
 
     async fn get(&self, key: &str) -> Result<Vec<u8>> {

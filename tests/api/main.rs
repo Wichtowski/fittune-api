@@ -4,6 +4,7 @@
 mod activities;
 mod auth;
 mod common;
+mod exercise_media;
 mod exercises;
 #[cfg(feature = "dev-fixtures")]
 mod fixtures;
