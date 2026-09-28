@@ -32,6 +32,7 @@ All endpoints except `/health` and `/api/v1/auth/{register,login}` require
 | 404    | `not_found`           | Resource does not exist **or belongs to another user**      |
 | 409    | `conflict`            | Stale workout revision, id collision                        |
 | 422    | `validation_failed`   | Semantically invalid input; `fields` maps field paths to messages (`exercises[0].sets[1].reps`) |
+| 429    | `rate_limited`        | Too many wrong invite codes from this client; try again later |
 | 500    | `internal_error`      | Unexpected server error (details are logged, not returned)  |
 
 ## Health
@@ -46,7 +47,7 @@ Sessions are opaque bearer tokens (not JWTs). They expire after `FITTUNE_SESSION
 
 | Method | Path                    | Body                                                               | Response |
 |--------|-------------------------|--------------------------------------------------------------------|----------|
-| POST   | `/api/v1/auth/register` | `{ username, email, password, display_name?, birthday? }`          | `201 AuthResponse` |
+| POST   | `/api/v1/auth/register` | `{ username, email, password, display_name?, birthday?, invite_code }` | `201 AuthResponse` |
 | POST   | `/api/v1/auth/login`    | `{ login, password }` — `login` is the username **or** email       | `200 AuthResponse` |
 | POST   | `/api/v1/auth/logout`   | —                                                                  | `204`, revokes the current token |
 
@@ -55,6 +56,35 @@ Sessions are opaque bearer tokens (not JWTs). They expire after `FITTUNE_SESSION
 Registration rules: username 3–32 chars of letters, digits, `.`, `_`, `-`; valid email; password
 at least 8 characters with an uppercase letter and a special character, not containing the
 username; birthday not in the future. Username and email are unique case-insensitively.
+
+Registration is invite-only unless the server runs with `FITTUNE_REGISTRATION=open`.
+Without `invite_code` the request fails with `422` and an `invite_code` field error, alongside any other field errors.
+A code that does not exist, has expired, was revoked or is used up fails the same way with one generic message, so codes cannot be probed.
+Codes ignore case, dashes and spaces.
+The code is checked before the account is created, in the same transaction, so a signup that fails for another reason (for example a taken username) does not use it up.
+After 10 wrong codes from one client within 15 minutes, registration from that client returns `429` until the window passes.
+New accounts are always ordinary users; a `role` in the body is ignored.
+
+## Invites (admin only)
+
+| Method | Path                            | Body | Response |
+|--------|---------------------------------|------|----------|
+| POST   | `/api/v1/admin/invites`         | `{ note?, expires_in_days?, max_uses? }` | `201 { invite: Invite, code }` |
+| GET    | `/api/v1/admin/invites`         | none | `Invite[]`, newest first, at most 200 |
+| DELETE | `/api/v1/admin/invites/{id}`    | none | `204`, revokes the invite (idempotent) |
+
+```json
+Invite {
+  "id": "uuid", "note": "for Ala" | null,
+  "status": "active" | "used" | "expired" | "revoked",
+  "max_uses": 1, "use_count": 0,
+  "expires_at": "…", "revoked_at": "…" | null,
+  "created_by": "username" | null, "created_at": "…"
+}
+```
+
+`expires_in_days` is 1-90 (default 7) and `max_uses` is 1-50 (default 1); `note` is up to 120 characters.
+`code` looks like `a1b2-c3d4-e5f6-g7h8-j9k0-mnpq-rs` and is returned only by `POST`; only its SHA-256 digest is stored.
 
 ## Profile
 

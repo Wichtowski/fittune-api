@@ -29,6 +29,8 @@ pub enum ApiError {
     NotFound(&'static str),
     #[error("{0}")]
     Conflict(String),
+    #[error("too many attempts, try again later")]
+    RateLimited,
     #[error("database error")]
     Database(#[from] sqlx::Error),
     #[error("internal error")]
@@ -61,6 +63,7 @@ impl ApiError {
             Self::Forbidden => (StatusCode::FORBIDDEN, "forbidden"),
             Self::NotFound(_) => (StatusCode::NOT_FOUND, "not_found"),
             Self::Conflict(_) => (StatusCode::CONFLICT, "conflict"),
+            Self::RateLimited => (StatusCode::TOO_MANY_REQUESTS, "rate_limited"),
             Self::Database(_) | Self::Internal(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "internal_error")
             }
@@ -112,6 +115,12 @@ impl From<PathRejection> for ApiError {
 #[derive(Debug, Default)]
 pub struct FieldErrors(BTreeMap<String, String>);
 
+impl From<BTreeMap<String, String>> for FieldErrors {
+    fn from(fields: BTreeMap<String, String>) -> Self {
+        Self(fields)
+    }
+}
+
 impl FieldErrors {
     /// Records `message` for `field`, keeping the first message if the field already failed.
     pub fn add(&mut self, field: impl Into<String>, message: impl Into<String>) {
@@ -141,7 +150,7 @@ impl FieldErrors {
         }
     }
 
-    fn into_error(self) -> ApiError {
+    pub(crate) fn into_error(self) -> ApiError {
         let message = self
             .0
             .values()
