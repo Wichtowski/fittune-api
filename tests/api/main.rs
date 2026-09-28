@@ -5,6 +5,8 @@ mod activities;
 mod auth;
 mod common;
 mod exercises;
+#[cfg(feature = "dev-fixtures")]
+mod fixtures;
 mod invites;
 mod photos;
 mod places;

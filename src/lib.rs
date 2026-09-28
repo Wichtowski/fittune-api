@@ -9,6 +9,8 @@ pub mod equipment;
 pub mod error;
 pub mod exercises;
 mod extract;
+#[cfg(feature = "dev-fixtures")]
+pub mod fixtures;
 pub mod invites;
 mod pagination;
 pub mod photos;

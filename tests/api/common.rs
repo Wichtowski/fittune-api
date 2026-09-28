@@ -18,6 +18,21 @@ use tower::ServiceExt;
 
 pub const PASSWORD: &str = "Squat#Depth1";
 
+pub fn config(registration: Registration) -> Config {
+    Config {
+        database_url: String::new(),
+        db_max_connections: 5,
+        bind_addr: ([127, 0, 0, 1], 0).into(),
+        cors_origins: vec!["http://localhost:5173".into()],
+        session_ttl: Duration::from_secs(3600),
+        app_version: "test".into(),
+        log_format: LogFormat::Pretty,
+        photo_storage: None,
+        registration,
+        client_ip_header: Some(header::HeaderName::from_static("x-real-ip")),
+    }
+}
+
 pub struct TestApp {
     router: Router,
     pub pool: PgPool,
@@ -47,19 +62,7 @@ impl TestApp {
         registration: Registration,
         photos: Option<Arc<dyn PhotoStore>>,
     ) -> Self {
-        let config = Config {
-            database_url: String::new(),
-            db_max_connections: 5,
-            bind_addr: ([127, 0, 0, 1], 0).into(),
-            cors_origins: vec!["http://localhost:5173".into()],
-            session_ttl: Duration::from_secs(3600),
-            app_version: "test".into(),
-            log_format: LogFormat::Pretty,
-            photo_storage: None,
-            registration,
-            client_ip_header: Some(header::HeaderName::from_static("x-real-ip")),
-        };
-        let mut state = AppState::new(pool.clone(), config);
+        let mut state = AppState::new(pool.clone(), config(registration));
         state.photos = photos;
         let router = router(state);
         Self { router, pool }
