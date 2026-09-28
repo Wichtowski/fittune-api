@@ -285,15 +285,15 @@ pub struct ListParams {
     pub limit: i64,
 }
 
-/// Newest first, keyset-paginated on `(started_at, id)`.
+/// Workouts of any of `owners`, newest first, keyset-paginated on `(started_at, id)`.
 pub async fn list(
     db: &PgPool,
-    user_id: Uuid,
+    owners: &[Uuid],
     params: &ListParams,
 ) -> sqlx::Result<Vec<WorkoutSummary>> {
     let (before_at, before_id) = params.before.unzip();
     sqlx::query_as(
-        "SELECT w.id, w.routine_id, w.title, w.started_at, w.ended_at, to_jsonb(pv) AS place,
+        "SELECT w.id, w.user_id, w.routine_id, w.title, w.started_at, w.ended_at, to_jsonb(pv) AS place,
                 EXTRACT(EPOCH FROM (w.ended_at - w.started_at))::bigint AS duration_seconds,
                 COALESCE(agg.exercise_count, 0) AS exercise_count,
                 COALESCE(agg.set_count, 0) AS set_count,
@@ -314,13 +314,13 @@ pub async fn list(
              LEFT JOIN workout_sets ws ON ws.workout_exercise_id = we.id
              WHERE we.workout_id = w.id
          ) agg ON true
-         WHERE w.user_id = $1
+         WHERE w.user_id = ANY($1)
            AND ($2::text IS NULL OR ($2 = 'in_progress') = (w.ended_at IS NULL))
            AND ($3::timestamptz IS NULL OR (w.started_at, w.id) < ($3, $4))
          ORDER BY w.started_at DESC, w.id DESC
          LIMIT $5",
     )
-    .bind(user_id)
+    .bind(owners)
     .bind(params.status.map(|status| match status {
         StatusFilter::InProgress => "in_progress",
         StatusFilter::Completed => "completed",

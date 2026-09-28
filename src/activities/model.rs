@@ -91,6 +91,8 @@ impl ActivityRequest {
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct Activity {
     pub id: Uuid,
+    #[serde(skip)]
+    pub user_id: Uuid,
     pub kind: ActivityKind,
     pub title: String,
     pub notes: Option<String>,

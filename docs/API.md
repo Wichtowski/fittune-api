@@ -28,11 +28,11 @@ All endpoints except `/health` and `/api/v1/auth/{register,login}` require
 | 400    | `bad_request`         | Malformed JSON, unknown enum value, bad query/path parameter |
 | 401    | `unauthorized`        | Missing, invalid or expired token                           |
 | 401    | `invalid_credentials` | Wrong login or password                                     |
-| 403    | `forbidden`           | Authenticated but not allowed (admin-only actions)          |
+| 403    | `forbidden`           | Authenticated but not allowed (admin-only actions, a friend's unshared progress) |
 | 404    | `not_found`           | Resource does not exist **or belongs to another user**      |
-| 409    | `conflict`            | Stale workout revision, id collision                        |
+| 409    | `conflict`            | Stale workout revision, id collision, friend request to a user you blocked |
 | 422    | `validation_failed`   | Semantically invalid input; `fields` maps field paths to messages (`exercises[0].sets[1].reps`) |
-| 429    | `rate_limited`        | Too many wrong invite codes from this client; try again later |
+| 429    | `rate_limited`        | Too many wrong invite codes from this client, or too many friend lookups and requests; try again later |
 | 500    | `internal_error`      | Unexpected server error (details are logged, not returned)  |
 | 413    | `payload_too_large`   | Photo upload exceeds 10 MB |
 | 503    | `storage_unavailable` | Private photo storage is not configured |
@@ -335,6 +335,58 @@ three years.
 ```json
 Totals { "workouts": 3, "workout_seconds": 11700, "sets": 42, "reps": 380, "volume_kg": 18250.0,
          "activities": 2, "activity_seconds": 5400, "activity_distance_m": 16000.0 }
+```
+
+## Friends
+
+Users find each other by exact username (case-insensitive); there is no directory or partial search.
+Friends see each other only as `PublicUser { id, username, display_name }`, never email, birthday or role.
+A user with a block in either direction answers `404` like an unknown username.
+Lookups and friend requests share a limit of 300 per user per hour (`429 rate_limited`).
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/api/v1/users/lookup?username=` | `{ user: PublicUser, relationship }`, `relationship` is `self`, `none`, `outgoing`, `incoming` or `friends` |
+| GET | `/api/v1/friends` | `Friend[]` by username |
+| GET | `/api/v1/friends/requests` | `{ incoming: FriendRequest[], outgoing: FriendRequest[] }`, newest first |
+| POST | `/api/v1/friends/requests` | `{ username }` → `201 { user, relationship: "outgoing" }`; `200` with the current relationship when already sent or friends; `200 "friends"` when they had already asked you; `409` when you blocked them |
+| POST | `/api/v1/friends/requests/{user_id}/accept` | `Friend`; only the addressee can accept |
+| DELETE | `/api/v1/friends/requests/{user_id}` | `204`; declines an incoming or cancels an outgoing request |
+| DELETE | `/api/v1/friends/{user_id}` | `204`; either side can remove, access ends immediately |
+| GET | `/api/v1/blocks` | `[{ user: PublicUser, created_at }]` |
+| PUT | `/api/v1/blocks/{user_id}` | `204`; idempotent, also deletes the friendship or pending request |
+| DELETE | `/api/v1/blocks/{user_id}` | `204`; does not restore the friendship |
+
+```json
+Friend { "user": PublicUser, "since": "…",
+         "sharing": { "workouts": true, "activities": false, "stats": true, "personal_records": false } }
+FriendRequest { "user": PublicUser, "created_at": "…" }
+```
+
+### Sharing and progress
+
+Nothing is shared until the user opts in.
+Progress photos are never visible to friends.
+Friend endpoints answer `404` for anyone who is not a friend and `403` when the friend does not share that resource.
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/api/v1/me/sharing` | `Sharing`, all `false` by default |
+| PUT | `/api/v1/me/sharing` | full `Sharing` → `Sharing`; unknown fields are rejected |
+| GET | `/api/v1/friends/feed?limit&cursor` | `Page<FeedEntry>` from every friend, for the kinds each one shares |
+| GET | `/api/v1/friends/{user_id}` | `Friend` |
+| GET | `/api/v1/friends/{user_id}/feed?limit&cursor` | `Page<FeedEntry>` of that friend |
+| GET | `/api/v1/friends/{user_id}/stats/overview?from&to&tz` | same as `/stats/overview`; needs `stats` |
+| GET | `/api/v1/friends/{user_id}/records` | same as `/stats/records`; needs `personal_records` |
+
+Feed entries are finished workouts and activities, newest first, without notes, place, routine or health data.
+
+```json
+FeedEntry { "user": PublicUser, "type": "workout", "id": "uuid", "title": "Push Day", "started_at": "…",
+            "ended_at": "…", "duration_seconds": 3600, "exercise_count": 1, "set_count": 2,
+            "total_reps": 10, "volume_kg": 1000.0, "exercise_names": ["Barbell Bench Press"] }
+FeedEntry { "user": PublicUser, "type": "activity", "id": "uuid", "kind": "run", "title": "Easy run",
+            "started_at": "…", "duration_seconds": 1800, "distance_m": 5000.0, "elevation_gain_m": null }
 ```
 
 ## Changes from the legacy Node API
