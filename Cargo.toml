@@ -9,11 +9,14 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.104"
+async-trait = "0.1.89"
 argon2 = "0.6.0"
-axum = { version = "0.8.9", features = ["macros"] }
+aws-sdk-s3 = { version = "1.137.0", default-features = false, features = ["default-https-client", "rt-tokio", "rustls"] }
+axum = { version = "0.8.9", features = ["macros", "multipart"] }
 base64 = "0.23.1"
 chrono = { version = "0.4.45", features = ["serde"] }
 dotenvy = "0.15.7"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
 rand = "0.10.3"
 rpassword = "7.5.4"
 serde = { version = "1.0.229", features = ["derive"] }

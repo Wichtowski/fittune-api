@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use axum::{
     Router,
@@ -8,6 +8,7 @@ use axum::{
 use fittune_api::{
     AppState,
     config::{Config, LogFormat, Registration},
+    photos::PhotoStore,
     router,
 };
 use http_body_util::BodyExt;
@@ -30,14 +31,22 @@ pub struct TestUser {
 impl TestApp {
     /// Open registration, so tests can create users freely
     pub fn new(pool: PgPool) -> Self {
-        Self::with_registration(pool, Registration::Open)
+        Self::with_registration_and_photos(pool, Registration::Open, None)
     }
 
     pub fn invite_only(pool: PgPool) -> Self {
-        Self::with_registration(pool, Registration::InviteOnly)
+        Self::with_registration_and_photos(pool, Registration::InviteOnly, None)
     }
 
-    fn with_registration(pool: PgPool, registration: Registration) -> Self {
+    pub fn with_photos(pool: PgPool, photos: Option<Arc<dyn PhotoStore>>) -> Self {
+        Self::with_registration_and_photos(pool, Registration::Open, photos)
+    }
+
+    fn with_registration_and_photos(
+        pool: PgPool,
+        registration: Registration,
+        photos: Option<Arc<dyn PhotoStore>>,
+    ) -> Self {
         let config = Config {
             database_url: String::new(),
             db_max_connections: 5,
@@ -46,11 +55,48 @@ impl TestApp {
             session_ttl: Duration::from_secs(3600),
             app_version: "test".into(),
             log_format: LogFormat::Pretty,
+            photo_storage: None,
             registration,
             client_ip_header: Some(header::HeaderName::from_static("x-real-ip")),
         };
-        let router = router(AppState::new(pool.clone(), config));
+        let mut state = AppState::new(pool.clone(), config);
+        state.photos = photos;
+        let router = router(state);
         Self { router, pool }
+    }
+
+    pub async fn raw(
+        &self,
+        method: Method,
+        uri: &str,
+        token: Option<&str>,
+        content_type: Option<&str>,
+        bytes: Vec<u8>,
+    ) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
+        let mut builder = Request::builder().method(method).uri(uri);
+        if let Some(token) = token {
+            builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
+        }
+        if let Some(content_type) = content_type {
+            builder = builder.header(header::CONTENT_TYPE, content_type);
+        }
+        let request = builder.body(Body::from(bytes)).expect("valid request");
+        let response = self
+            .router
+            .clone()
+            .oneshot(request)
+            .await
+            .expect("infallible router");
+        let status = response.status();
+        let headers = response.headers().clone();
+        let bytes = response
+            .into_body()
+            .collect()
+            .await
+            .expect("readable body")
+            .to_bytes()
+            .to_vec();
+        (status, headers, bytes)
     }
 
     pub async fn request(

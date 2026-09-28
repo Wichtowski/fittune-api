@@ -27,9 +27,45 @@ services:
       FITTUNE_CORS_ORIGINS: ${FITTUNE_CORS_ORIGINS:-http://localhost:5173}
       FITTUNE_LOG_FORMAT: pretty
       FITTUNE_APP_VERSION: dev
+      FITTUNE_PHOTOS_ENDPOINT: http://fittune-rustfs:9000
+      FITTUNE_PHOTOS_BUCKET: ${FITTUNE_PHOTOS_BUCKET:-fittune-progress-photos}
+      FITTUNE_PHOTOS_ACCESS_KEY: ${FITTUNE_PHOTOS_ACCESS_KEY:-fittunelocal}
+      FITTUNE_PHOTOS_SECRET_KEY: ${FITTUNE_PHOTOS_SECRET_KEY:-fittune-local-secret-change-me}
     depends_on:
       fittune-postgres:
         condition: service_healthy
+      fittune-photos-bucket:
+        condition: service_completed_successfully
+
+  fittune-rustfs:
+    image: rustfs/rustfs:1.0.0-rc.6
+    environment:
+      RUSTFS_ACCESS_KEY: ${FITTUNE_PHOTOS_ACCESS_KEY:-fittunelocal}
+      RUSTFS_SECRET_KEY: ${FITTUNE_PHOTOS_SECRET_KEY:-fittune-local-secret-change-me}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_CONSOLE_ENABLE: "false"
+    ports:
+      - "127.0.0.1:${FITTUNE_RUSTFS_PORT:-9000}:9000"
+    volumes:
+      - rustfsdata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  fittune-photos-bucket:
+    image: rustfs/rc:latest
+    depends_on:
+      fittune-rustfs:
+        condition: service_healthy
+    environment:
+      ACCESS_KEY: ${FITTUNE_PHOTOS_ACCESS_KEY:-fittunelocal}
+      SECRET_KEY: ${FITTUNE_PHOTOS_SECRET_KEY:-fittune-local-secret-change-me}
+      BUCKET: ${FITTUNE_PHOTOS_BUCKET:-fittune-progress-photos}
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["/usr/bin/rc alias set photos http://fittune-rustfs:9000 \"$$ACCESS_KEY\" \"$$SECRET_KEY\" && (/usr/bin/rc ls photos/\"$$BUCKET\" >/dev/null 2>&1 || /usr/bin/rc mb photos/\"$$BUCKET\")"]
 
 volumes:
   pgdata:
+  rustfsdata:
