@@ -90,7 +90,7 @@ async fn register(
             match invites::repo::lock_usable(&mut tx, &invites::code::hash(code)).await? {
                 Some(id) => Some(id),
                 None => {
-                    state.invite_attempts.record_failure(&client);
+                    state.invite_attempts.record(&client);
                     return Err(ApiError::validation("invite_code", INVALID_INVITE));
                 }
             }

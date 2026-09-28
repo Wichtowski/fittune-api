@@ -20,7 +20,7 @@ use tower_http::{
 use tracing::Level;
 
 use crate::{
-    activities, auth, config::Config, error::ApiError, exercises, invites, photos, places,
+    activities, auth, config::Config, error::ApiError, exercises, friends, invites, photos, places,
     rate_limit::RateLimiter, routines, stats, users, workouts,
 };
 
@@ -31,12 +31,18 @@ const MAX_BODY_BYTES: usize = 1024 * 1024;
 const INVITE_FAILURES_PER_WINDOW: u32 = 10;
 const INVITE_FAILURE_WINDOW: Duration = Duration::from_secs(15 * 60);
 
+/// Username lookups and friend requests allowed per user each hour. The app serves a small
+/// invited group, so this only stops a runaway client
+const FRIEND_ACTIONS_PER_WINDOW: u32 = 300;
+const FRIEND_ACTION_WINDOW: Duration = Duration::from_secs(60 * 60);
+
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
     pub config: Arc<Config>,
     pub photos: Option<Arc<dyn photos::PhotoStore>>,
     pub invite_attempts: Arc<RateLimiter>,
+    pub friend_actions: Arc<RateLimiter>,
 }
 
 impl AppState {
@@ -52,6 +58,10 @@ impl AppState {
                 INVITE_FAILURES_PER_WINDOW,
                 INVITE_FAILURE_WINDOW,
             )),
+            friend_actions: Arc::new(RateLimiter::new(
+                FRIEND_ACTIONS_PER_WINDOW,
+                FRIEND_ACTION_WINDOW,
+            )),
         }
     }
 }
@@ -61,6 +71,7 @@ pub fn router(state: AppState) -> Router {
         .nest("/auth", auth::router())
         .merge(users::router())
         .merge(invites::router())
+        .merge(friends::router())
         .merge(exercises::router())
         .merge(exercises::media::router())
         .merge(routines::router())

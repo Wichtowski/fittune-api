@@ -6,7 +6,7 @@ use super::model::{Activity, ActivityDraft, ActivityKind};
 
 macro_rules! activity_columns {
     () => {
-        "id, kind, title, notes, started_at, duration_seconds, distance_m, elevation_gain_m, \
+        "id, user_id, kind, title, notes, started_at, duration_seconds, distance_m, elevation_gain_m, \
          avg_heart_rate, calories, perceived_effort, created_at, updated_at"
     };
 }
@@ -85,10 +85,10 @@ pub async fn find(db: &PgPool, user_id: Uuid, id: Uuid) -> sqlx::Result<Option<A
     .await
 }
 
-/// Newest first, keyset-paginated on `(started_at, id)`.
+/// Activities of any of `owners`, newest first, keyset-paginated on `(started_at, id)`.
 pub async fn list(
     db: &PgPool,
-    user_id: Uuid,
+    owners: &[Uuid],
     kind: Option<ActivityKind>,
     before: Option<(DateTime<Utc>, Uuid)>,
     limit: i64,
@@ -98,13 +98,13 @@ pub async fn list(
         "SELECT ",
         activity_columns!(),
         " FROM activities
-          WHERE user_id = $1
+          WHERE user_id = ANY($1)
             AND ($2::text IS NULL OR kind = $2)
             AND ($3::timestamptz IS NULL OR (started_at, id) < ($3, $4))
           ORDER BY started_at DESC, id DESC
           LIMIT $5"
     ))
-    .bind(user_id)
+    .bind(owners)
     .bind(kind)
     .bind(before_at)
     .bind(before_id)

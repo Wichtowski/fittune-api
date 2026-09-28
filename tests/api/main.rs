@@ -8,6 +8,7 @@ mod exercise_media;
 mod exercises;
 #[cfg(feature = "dev-fixtures")]
 mod fixtures;
+mod friends;
 mod invites;
 mod photos;
 mod places;

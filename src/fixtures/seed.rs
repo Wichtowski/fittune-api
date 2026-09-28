@@ -56,6 +56,7 @@ pub async fn seed(state: &AppState, clock: Clock) -> Result<Summary> {
         sessions.push(session);
     }
     seed_account(&api, &ACCOUNTS[0], &admin.token, clock, &mut summary).await?;
+    save_friends(&api, &sessions).await?;
     summary.active_invite_code = save_invites(state, &api, &admin).await?;
 
     for session in sessions.iter().chain([&admin]) {
@@ -118,6 +119,46 @@ async fn seed_account(
         api.expect(Method::PUT, &uri, token, Some(&activity.body), SAVED)
             .await?;
         summary.activities += 1;
+    }
+    Ok(())
+}
+
+/// demo and casual are friends, demo sharing everything and casual only its sessions, and
+/// newbie's request to demo waits for an answer. Requests are idempotent, and sending one back
+/// accepts it, so reruns keep this state
+async fn save_friends(api: &Api, sessions: &[Session]) -> Result<()> {
+    let [demo, casual, newbie] = sessions else {
+        bail!("expected the demo, casual and newbie sessions");
+    };
+    for (from, to) in [(casual, "demo"), (demo, "casual"), (newbie, "demo")] {
+        let body = json!({ "username": to });
+        api.expect(
+            Method::POST,
+            "/api/v1/friends/requests",
+            Some(&from.token),
+            Some(&body),
+            SAVED,
+        )
+        .await?;
+    }
+    for (session, sharing) in [
+        (
+            demo,
+            json!({ "workouts": true, "activities": true, "stats": true, "personal_records": true }),
+        ),
+        (
+            casual,
+            json!({ "workouts": true, "activities": true, "stats": false, "personal_records": false }),
+        ),
+    ] {
+        api.expect(
+            Method::PUT,
+            "/api/v1/me/sharing",
+            Some(&session.token),
+            Some(&sharing),
+            OK,
+        )
+        .await?;
     }
     Ok(())
 }

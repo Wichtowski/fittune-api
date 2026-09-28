@@ -11,6 +11,7 @@ pub mod exercises;
 mod extract;
 #[cfg(feature = "dev-fixtures")]
 pub mod fixtures;
+pub mod friends;
 pub mod invites;
 mod pagination;
 pub mod photos;

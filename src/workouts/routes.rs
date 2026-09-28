@@ -41,7 +41,7 @@ async fn list(
         before: pagination::decode_cursor(query.cursor.as_deref())?,
         limit: limit + 1,
     };
-    let rows = repo::list(&state.db, auth.user_id(), &params).await?;
+    let rows = repo::list(&state.db, &[auth.user_id()], &params).await?;
     Ok(axum::Json(pagination::paginate(rows, limit, |w| {
         (w.started_at, w.id)
     })))
