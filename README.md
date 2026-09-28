@@ -41,7 +41,7 @@ Prerequisites: Rust 1.94 (pinned in `rust-toolchain.toml`) and Docker Compose (o
 
 ```bash
 cp .env.example .env
-make up        # Postgres on localhost:5432
+make up        # Postgres on localhost:5432 and private RustFS on localhost:9000
 make run       # API on http://localhost:4733, applies migrations
 ```
 
@@ -53,6 +53,13 @@ make help      # everything else
 
 Integration tests use `#[sqlx::test]`: every test gets its own freshly migrated database created
 through `DATABASE_URL`, so the role needs `CREATEDB`.
+
+`make up` also starts RustFS on `localhost:9000` and creates the private
+`fittune-progress-photos` bucket. The API uses the S3-compatible endpoint with path-style
+addressing. Progress photos are decoded, resized and re-encoded as JPEG before upload; the
+original file and its EXIF metadata are never stored. A thumbnail and full-size image are kept
+in RustFS, and only authenticated API endpoints can read them. Use separate, random
+`FITTUNE_PHOTOS_ACCESS_KEY` and `FITTUNE_PHOTOS_SECRET_KEY` values outside local development.
 
 `.env.example` sets `FITTUNE_REGISTRATION=open`, so local sign-up works without invites.
 Admins manage the shared exercise catalog, list users and issue invite codes:
@@ -74,6 +81,9 @@ make grant-admin LOGIN=oskyy                             # promote an existing a
 | `FITTUNE_LOG_FORMAT` | `pretty` | `pretty` or `json` |
 | `FITTUNE_LOG` | `fittune_api=info,tower_http=info,sqlx=warn,info` | tracing filter |
 | `FITTUNE_APP_VERSION` | `dev` | Reported by `/health`; set to the release tag on deploy |
+| `FITTUNE_PHOTOS_ENDPOINT` | — | RustFS S3 endpoint; photo API is unavailable when unset |
+| `FITTUNE_PHOTOS_BUCKET` | — | Private bucket, created by Compose |
+| `FITTUNE_PHOTOS_ACCESS_KEY` / `FITTUNE_PHOTOS_SECRET_KEY` | — | RustFS credentials; required with the endpoint |
 | `FITTUNE_REGISTRATION` | `invite_only` | `invite_only` (sign-up needs an admin's invite code) or `open` (local development only) |
 | `FITTUNE_CLIENT_IP_HEADER` | (unset) | Header with the client IP set by a trusted proxy, used to rate-limit invite guessing; `X-Real-IP` in production |
 
@@ -101,6 +111,21 @@ GitHub Actions:
 Required secrets (same names as EchoTrade): `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`,
 `DEPLOY_SSH_PASSPHRASE`, `DEPLOY_PATH` (e.g. `/opt/fittune`), and `ENV_PRODUCTION` — the
 production `.env` body. Repository variable: `DEPLOY_ARCHIVE` (e.g. `fittune-api.tar.gz`).
+
+Add `FITTUNE_PHOTOS_BUCKET`, `FITTUNE_PHOTOS_ACCESS_KEY`, and
+`FITTUNE_PHOTOS_SECRET_KEY` to `ENV_PRODUCTION` before deploying this release. RustFS is
+only on the internal Compose network; do not add a public port or bucket policy. Compose keeps
+its data in the `rustfsdata` named volume. Back up that volume **together with** Postgres and
+the deployment `.env` secrets, and restore the matching pair. For a consistent cold backup,
+stop the stack with `docker compose --env-file .env -f docker-compose.prod.yml down` (which
+preserves named volumes), archive the Compose project's `pgdata` and `rustfsdata` volumes, then start
+the stack again. Keep encrypted copies off the VPS and test a restore before relying on them.
+
+The shared platform-edge Caddyfile currently caps FitTune API requests at 1 MB and blocks
+`blob:` previews. Apply the reviewed changes in
+[`docs/platform-edge-progress-photos.patch`](docs/platform-edge-progress-photos.patch) to the
+`platform-edge` repository before deploying the app. The patch permits 11 MB at the proxy
+(multipart overhead included); the API itself still rejects image files above 10 MB.
 
 Minimal `ENV_PRODUCTION`:
 

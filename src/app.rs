@@ -20,7 +20,7 @@ use tower_http::{
 use tracing::Level;
 
 use crate::{
-    activities, auth, config::Config, error::ApiError, exercises, invites, places,
+    activities, auth, config::Config, error::ApiError, exercises, invites, photos, places,
     rate_limit::RateLimiter, routines, stats, users, workouts,
 };
 
@@ -35,14 +35,19 @@ const INVITE_FAILURE_WINDOW: Duration = Duration::from_secs(15 * 60);
 pub struct AppState {
     pub db: PgPool,
     pub config: Arc<Config>,
+    pub photos: Option<Arc<dyn photos::PhotoStore>>,
     pub invite_attempts: Arc<RateLimiter>,
 }
 
 impl AppState {
     pub fn new(db: PgPool, config: Config) -> Self {
+        let photos = config.photo_storage.as_ref().map(|storage| {
+            Arc::new(photos::S3PhotoStore::new(storage)) as Arc<dyn photos::PhotoStore>
+        });
         Self {
             db,
             config: Arc::new(config),
+            photos,
             invite_attempts: Arc::new(RateLimiter::new(
                 INVITE_FAILURES_PER_WINDOW,
                 INVITE_FAILURE_WINDOW,
@@ -60,6 +65,7 @@ pub fn router(state: AppState) -> Router {
         .merge(routines::router())
         .merge(places::router())
         .merge(workouts::router())
+        .merge(photos::router())
         .merge(activities::router())
         .merge(stats::router())
         .fallback(|| async { ApiError::NotFound("route") });

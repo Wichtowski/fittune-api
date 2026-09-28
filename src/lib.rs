@@ -11,6 +11,7 @@ pub mod exercises;
 mod extract;
 pub mod invites;
 mod pagination;
+pub mod photos;
 pub mod places;
 pub mod rate_limit;
 pub mod routines;

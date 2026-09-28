@@ -34,6 +34,29 @@ All endpoints except `/health` and `/api/v1/auth/{register,login}` require
 | 422    | `validation_failed`   | Semantically invalid input; `fields` maps field paths to messages (`exercises[0].sets[1].reps`) |
 | 429    | `rate_limited`        | Too many wrong invite codes from this client; try again later |
 | 500    | `internal_error`      | Unexpected server error (details are logged, not returned)  |
+| 413    | `payload_too_large`   | Photo upload exceeds 10 MB |
+| 503    | `storage_unavailable` | Private photo storage is not configured |
+
+## Private progress photos
+
+Photos are private to their owner. The client saves a completed workout independently, then may
+attach a photo. `PUT` with a client-generated UUID makes retries safe. Both `PUT` and `POST`
+accept `multipart/form-data` with one `file` (JPEG, PNG, or WebP, at most 10 MB) and optional
+`workout_id` of a completed workout owned by the caller. The API re-encodes the image and strips
+metadata before storing the full-size image and thumbnail in RustFS. Images are returned only
+through authenticated API endpoints with `Cache-Control: private, no-store`.
+
+| Method | Path | Response |
+|--------|------|----------|
+| POST | `/api/v1/progress-photos` | `201 ProgressPhoto` |
+| PUT | `/api/v1/progress-photos/{id}` | `201 ProgressPhoto`; replay returns `200` |
+| GET | `/api/v1/progress-photos?workout_id=&limit=50&offset=0` | `ProgressPhoto[]`, newest first |
+| GET | `/api/v1/progress-photos/{id}/file?size=full\|thumb` | JPEG image |
+| DELETE | `/api/v1/progress-photos/{id}` | `204`; deletes both stored images |
+
+`ProgressPhoto`: `{ id, workout_id, width, height, bytes, taken_at, created_at }`.
+Deleting an account removes its stored images. Deleting a workout keeps its photo in the user's
+gallery and clears the photo's `workout_id`.
 
 ## Health
 
