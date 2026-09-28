@@ -9,10 +9,10 @@ async fn places_are_private_validated_versioned_and_archivable(pool: PgPool) {
     let app = TestApp::new(pool);
     let owner = app.register("placeowner").await;
     let other = app.register("placeother").await;
-    let uri = format!("/api/v1/places/{}", uuid());
+    let uri = format!("/api/v1/train/places/{}", uuid());
     let input = json!({"name": " Home ", "kind": "home", "equipment": ["dumbbells", "dumbbells"]});
     assert_eq!(
-        app.request(Method::GET, "/api/v1/places", None, None)
+        app.request(Method::GET, "/api/v1/train/places", None, None)
             .await
             .0,
         StatusCode::UNAUTHORIZED
@@ -26,7 +26,10 @@ async fn places_are_private_validated_versioned_and_archivable(pool: PgPool) {
         app.put(&uri, &owner.token, same.clone()).await.1["version_id"],
         home["version_id"]
     );
-    assert_eq!(app.get("/api/v1/places", &other.token).await.1, json!([]));
+    assert_eq!(
+        app.get("/api/v1/train/places", &other.token).await.1,
+        json!([])
+    );
     assert_eq!(
         app.put(&uri, &other.token, same.clone()).await.0,
         StatusCode::NOT_FOUND
@@ -68,7 +71,7 @@ async fn places_are_private_validated_versioned_and_archivable(pool: PgPool) {
         .await;
     assert_ne!(updated["version_id"], home["version_id"]);
     assert_eq!(
-        app.get("/api/v1/places", &owner.token).await.1,
+        app.get("/api/v1/train/places", &owner.token).await.1,
         json!([updated])
     );
     assert_eq!(
@@ -79,7 +82,10 @@ async fn places_are_private_validated_versioned_and_archivable(pool: PgPool) {
         app.delete(&uri, &owner.token).await.0,
         StatusCode::NO_CONTENT
     );
-    assert_eq!(app.get("/api/v1/places", &owner.token).await.1, json!([]));
+    assert_eq!(
+        app.get("/api/v1/train/places", &owner.token).await.1,
+        json!([])
+    );
     assert_eq!(
         app.put(&uri, &owner.token, same).await.0,
         StatusCode::NOT_FOUND
@@ -91,7 +97,7 @@ async fn offline_workouts_keep_owned_place_versions_after_edit_and_archive(pool:
     let app = TestApp::new(pool);
     let owner = app.register("offlineowner").await;
     let other = app.register("offlineother").await;
-    let place_uri = format!("/api/v1/places/{}", uuid());
+    let place_uri = format!("/api/v1/train/places/{}", uuid());
     let (_, home) = app
         .put(
             &place_uri,
@@ -99,7 +105,7 @@ async fn offline_workouts_keep_owned_place_versions_after_edit_and_archive(pool:
             json!({"name": "Home", "kind": "home", "equipment": ["resistance_band"]}),
         )
         .await;
-    let workout_uri = format!("/api/v1/workouts/{}", uuid());
+    let workout_uri = format!("/api/v1/train/workouts/{}", uuid());
     let mut draft = json!({"title": "Offline session", "started_at": "2026-09-20T17:00:00Z", "revision": 1, "exercises": [], "place_version_id": home["version_id"]});
     assert_eq!(
         app.put(&workout_uri, &owner.token, draft.clone()).await.1["place"],
@@ -120,15 +126,15 @@ async fn offline_workouts_keep_owned_place_versions_after_edit_and_archive(pool:
     assert_eq!(status, StatusCode::OK, "{saved}");
     assert_eq!(saved["place"], home);
     assert_eq!(
-        app.get("/api/v1/workouts", &owner.token).await.1["items"][0]["place"],
+        app.get("/api/v1/train/workouts", &owner.token).await.1["items"][0]["place"],
         home
     );
-    let offline_uri = format!("/api/v1/workouts/{}", uuid());
+    let offline_uri = format!("/api/v1/train/workouts/{}", uuid());
     assert_eq!(
         app.put(&offline_uri, &owner.token, draft.clone()).await.1["place"],
         home
     );
-    let foreign_uri = format!("/api/v1/workouts/{}", uuid());
+    let foreign_uri = format!("/api/v1/train/workouts/{}", uuid());
     assert_eq!(
         app.put(&foreign_uri, &other.token, draft.clone()).await.0,
         StatusCode::UNPROCESSABLE_ENTITY
@@ -163,7 +169,7 @@ async fn offline_workouts_keep_owned_place_versions_after_edit_and_archive(pool:
 async fn equipment_order_does_not_create_new_versions(pool: PgPool) {
     let app = TestApp::new(pool);
     let owner = app.register("orderowner").await;
-    let uri = format!("/api/v1/places/{}", uuid());
+    let uri = format!("/api/v1/train/places/{}", uuid());
     let (_, first) = app
         .put(
             &uri,
@@ -191,14 +197,14 @@ async fn users_keep_at_most_ten_active_places(pool: PgPool) {
     let place = |n: usize| json!({"name": format!("Place {n}"), "kind": "custom", "equipment": []});
     let mut uris = Vec::new();
     for n in 0..10 {
-        let uri = format!("/api/v1/places/{}", uuid());
+        let uri = format!("/api/v1/train/places/{}", uuid());
         assert_eq!(
             app.put(&uri, &owner.token, place(n)).await.0,
             StatusCode::CREATED
         );
         uris.push(uri);
     }
-    let extra = format!("/api/v1/places/{}", uuid());
+    let extra = format!("/api/v1/train/places/{}", uuid());
     let (status, body) = app.put(&extra, &owner.token, place(10)).await;
     assert_eq!(status, StatusCode::CONFLICT, "{body}");
 
@@ -216,7 +222,7 @@ async fn users_keep_at_most_ten_active_places(pool: PgPool) {
         app.delete(&uris[0], &owner.token).await.0,
         StatusCode::NO_CONTENT
     );
-    let fresh = format!("/api/v1/places/{}", uuid());
+    let fresh = format!("/api/v1/train/places/{}", uuid());
     assert_eq!(
         app.put(&fresh, &owner.token, place(10)).await.0,
         StatusCode::CREATED
@@ -258,7 +264,7 @@ async fn places_accept_every_equipment_item(pool: PgPool) {
     ]);
     let (status, place) = app
         .put(
-            &format!("/api/v1/places/{}", uuid()),
+            &format!("/api/v1/train/places/{}", uuid()),
             &owner.token,
             json!({"name": "Full gym", "kind": "gym", "equipment": all}),
         )

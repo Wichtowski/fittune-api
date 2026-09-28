@@ -20,8 +20,8 @@ use tower_http::{
 use tracing::Level;
 
 use crate::{
-    activities, auth, config::Config, error::ApiError, exercises, friends, invites, photos, places,
-    rate_limit::RateLimiter, routines, stats, users, workouts,
+    auth, config::Config, error::ApiError, friends, health, invites, photos,
+    rate_limit::RateLimiter, train, users,
 };
 
 const REQUEST_ID: HeaderName = HeaderName::from_static("x-request-id");
@@ -72,14 +72,8 @@ pub fn router(state: AppState) -> Router {
         .merge(users::router())
         .merge(invites::router())
         .merge(friends::router())
-        .merge(exercises::router())
-        .merge(exercises::media::router())
-        .merge(routines::router())
-        .merge(places::router())
-        .merge(workouts::router())
-        .merge(photos::router())
-        .merge(activities::router())
-        .merge(stats::router())
+        .nest("/train", train::router())
+        .nest("/health", health::router())
         .fallback(|| async { ApiError::NotFound("route") });
 
     let middleware = ServiceBuilder::new()
@@ -103,7 +97,7 @@ pub fn router(state: AppState) -> Router {
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES));
 
     Router::new()
-        .route("/health", get(health))
+        .route("/health", get(health_check))
         .nest("/api/v1", api)
         .layer(middleware)
         .with_state(state)
@@ -128,7 +122,7 @@ fn cors(origins: &[String]) -> CorsLayer {
         .max_age(Duration::from_secs(60 * 60))
 }
 
-async fn health(State(state): State<AppState>) -> impl IntoResponse {
+async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
     let database = sqlx::query("SELECT 1").execute(&state.db).await.is_ok();
     let status = if database {
         StatusCode::OK

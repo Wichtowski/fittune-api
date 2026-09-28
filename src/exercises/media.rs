@@ -68,7 +68,7 @@ struct MediaRow {
 impl From<MediaRow> for ExerciseMedia {
     fn from(row: MediaRow) -> Self {
         let url = (row.provider == MediaProvider::Fittune)
-            .then(|| format!("/api/v1/exercise-media/{}/file", row.id));
+            .then(|| format!("/api/v1/train/exercise-media/{}/file", row.id));
         Self {
             id: row.id,
             kind: row.kind,

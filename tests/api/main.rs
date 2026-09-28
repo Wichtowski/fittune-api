@@ -10,6 +10,7 @@ mod exercises;
 mod fixtures;
 mod friends;
 mod invites;
+mod namespaces;
 mod photos;
 mod places;
 mod routines;

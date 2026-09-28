@@ -269,7 +269,7 @@ async fn account_deletion_removes_custom_exercises_in_use(pool: PgPool) {
     let user = app.register("lifter").await;
     let (status, exercise) = app
         .post(
-            "/api/v1/exercises",
+            "/api/v1/train/exercises",
             Some(&user.token),
             json!({ "name": "Zercher Squat", "tracking": "weight_reps", "primary_muscle": "quadriceps" }),
         )
@@ -278,7 +278,7 @@ async fn account_deletion_removes_custom_exercises_in_use(pool: PgPool) {
     let exercise_id = exercise["id"].as_str().expect("exercise id");
     let (status, _) = app
         .post(
-            "/api/v1/routines",
+            "/api/v1/train/routines",
             Some(&user.token),
             json!({ "name": "Legs", "exercises": [{ "exercise_id": exercise_id }] }),
         )
@@ -286,7 +286,7 @@ async fn account_deletion_removes_custom_exercises_in_use(pool: PgPool) {
     assert_eq!(status, StatusCode::CREATED);
     let (status, _) = app
         .put(
-            &format!("/api/v1/workouts/{}", uuid()),
+            &format!("/api/v1/train/workouts/{}", uuid()),
             &user.token,
             json!({
                 "title": "Legs",

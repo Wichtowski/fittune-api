@@ -36,7 +36,7 @@ async fn put_creates_then_replaces_a_workout(pool: PgPool) {
     let user = app.register("lifter").await;
     let bench = app.catalog_exercise("Barbell Bench Press").await;
     let id = uuid();
-    let uri = format!("/api/v1/workouts/{id}");
+    let uri = format!("/api/v1/train/workouts/{id}");
 
     let draft = workout(&bench, "2026-09-20T17:00:00Z", None, 1);
     let (status, created) = app.put(&uri, &user.token, draft.clone()).await;
@@ -81,7 +81,7 @@ async fn stale_revisions_are_rejected(pool: PgPool) {
     let app = TestApp::new(pool);
     let user = app.register("lifter").await;
     let bench = app.catalog_exercise("Barbell Bench Press").await;
-    let uri = format!("/api/v1/workouts/{}", uuid());
+    let uri = format!("/api/v1/train/workouts/{}", uuid());
 
     app.put(
         &uri,
@@ -109,7 +109,7 @@ async fn workouts_are_isolated_between_users(pool: PgPool) {
     let owner = app.register("owner").await;
     let intruder = app.register("intruder").await;
     let bench = app.catalog_exercise("Barbell Bench Press").await;
-    let uri = format!("/api/v1/workouts/{}", uuid());
+    let uri = format!("/api/v1/train/workouts/{}", uuid());
 
     app.put(
         &uri,
@@ -141,14 +141,14 @@ async fn workouts_cannot_reference_other_users_exercises(pool: PgPool) {
     let other = app.register("other").await;
     let (_, custom) = app
         .post(
-            "/api/v1/exercises",
+            "/api/v1/train/exercises",
             Some(&owner.token),
             json!({ "name": "Secret Lift", "tracking": "weight_reps", "primary_muscle": "chest" }),
         )
         .await;
     let custom_id = custom["id"].as_str().expect("id");
 
-    let uri = format!("/api/v1/workouts/{}", uuid());
+    let uri = format!("/api/v1/train/workouts/{}", uuid());
     let (status, body) = app
         .put(
             &uri,
@@ -174,7 +174,7 @@ async fn list_paginates_and_filters_by_status(pool: PgPool) {
         let end = format!("2026-09-{day:02}T18:00:00Z");
         let ended = (day != 5).then_some(end.as_str());
         app.put(
-            &format!("/api/v1/workouts/{}", uuid()),
+            &format!("/api/v1/train/workouts/{}", uuid()),
             &user.token,
             workout(&bench, &start, ended, 1),
         )
@@ -182,7 +182,10 @@ async fn list_paginates_and_filters_by_status(pool: PgPool) {
     }
 
     let (status, page) = app
-        .get("/api/v1/workouts?status=completed&limit=3", &user.token)
+        .get(
+            "/api/v1/train/workouts?status=completed&limit=3",
+            &user.token,
+        )
         .await;
     assert_eq!(status, StatusCode::OK);
     let items = page["items"].as_array().expect("items");
@@ -200,7 +203,7 @@ async fn list_paginates_and_filters_by_status(pool: PgPool) {
     let cursor = page["next_cursor"].as_str().expect("more pages");
     let (_, next) = app
         .get(
-            &format!("/api/v1/workouts?status=completed&limit=3&cursor={cursor}"),
+            &format!("/api/v1/train/workouts?status=completed&limit=3&cursor={cursor}"),
             &user.token,
         )
         .await;
@@ -208,7 +211,7 @@ async fn list_paginates_and_filters_by_status(pool: PgPool) {
     assert!(next["next_cursor"].is_null());
 
     let (_, active) = app
-        .get("/api/v1/workouts?status=in_progress", &user.token)
+        .get("/api/v1/train/workouts?status=in_progress", &user.token)
         .await;
     assert_eq!(active["items"].as_array().map(Vec::len), Some(1));
     assert_eq!(active["items"][0]["started_at"], "2026-09-05T17:00:00Z");
@@ -219,7 +222,7 @@ async fn delete_removes_workout(pool: PgPool) {
     let app = TestApp::new(pool);
     let user = app.register("lifter").await;
     let bench = app.catalog_exercise("Barbell Bench Press").await;
-    let uri = format!("/api/v1/workouts/{}", uuid());
+    let uri = format!("/api/v1/train/workouts/{}", uuid());
     app.put(
         &uri,
         &user.token,
@@ -242,7 +245,7 @@ async fn exercise_history_reports_sessions_and_records(pool: PgPool) {
     let bench = app.catalog_exercise("Barbell Bench Press").await;
 
     app.put(
-        &format!("/api/v1/workouts/{}", uuid()),
+        &format!("/api/v1/train/workouts/{}", uuid()),
         &user.token,
         workout(
             &bench,
@@ -262,21 +265,24 @@ async fn exercise_history_reports_sessions_and_records(pool: PgPool) {
     heavier["exercises"][0]["sets"][1]["reps"] = json!(3);
     let heavier_id = uuid();
     app.put(
-        &format!("/api/v1/workouts/{heavier_id}"),
+        &format!("/api/v1/train/workouts/{heavier_id}"),
         &user.token,
         heavier,
     )
     .await;
     // In-progress workouts never count towards history.
     app.put(
-        &format!("/api/v1/workouts/{}", uuid()),
+        &format!("/api/v1/train/workouts/{}", uuid()),
         &user.token,
         workout(&bench, "2026-09-24T17:00:00Z", None, 1),
     )
     .await;
 
     let (status, history) = app
-        .get(&format!("/api/v1/exercises/{bench}/history"), &user.token)
+        .get(
+            &format!("/api/v1/train/exercises/{bench}/history"),
+            &user.token,
+        )
         .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(history["exercise"]["name"], "Barbell Bench Press");

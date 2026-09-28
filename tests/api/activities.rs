@@ -20,7 +20,7 @@ pub fn run(started_at: &str, distance_m: f64) -> Value {
 async fn put_creates_and_updates_activities(pool: PgPool) {
     let app = TestApp::new(pool);
     let user = app.register("runner").await;
-    let uri = format!("/api/v1/activities/{}", uuid());
+    let uri = format!("/api/v1/train/activities/{}", uuid());
 
     let (status, created) = app
         .put(&uri, &user.token, run("2026-09-26T06:00:00Z", 5000.0))
@@ -46,7 +46,7 @@ async fn activities_validate_and_stay_private(pool: PgPool) {
     let app = TestApp::new(pool);
     let owner = app.register("owner").await;
     let other = app.register("other").await;
-    let uri = format!("/api/v1/activities/{}", uuid());
+    let uri = format!("/api/v1/train/activities/{}", uuid());
 
     let mut invalid = run("2026-09-26T06:00:00Z", -1.0);
     invalid["duration_seconds"] = json!(0);
@@ -81,7 +81,7 @@ async fn list_filters_by_kind_and_paginates(pool: PgPool) {
     for day in 1..=3 {
         let start = format!("2026-09-{day:02}T06:00:00Z");
         app.put(
-            &format!("/api/v1/activities/{}", uuid()),
+            &format!("/api/v1/train/activities/{}", uuid()),
             &user.token,
             run(&start, 5000.0),
         )
@@ -89,21 +89,25 @@ async fn list_filters_by_kind_and_paginates(pool: PgPool) {
     }
     let mut ride = run("2026-09-04T06:00:00Z", 30_000.0);
     ride["kind"] = json!("ride");
-    app.put(&format!("/api/v1/activities/{}", uuid()), &user.token, ride)
-        .await;
+    app.put(
+        &format!("/api/v1/train/activities/{}", uuid()),
+        &user.token,
+        ride,
+    )
+    .await;
 
-    let (_, all) = app.get("/api/v1/activities", &user.token).await;
+    let (_, all) = app.get("/api/v1/train/activities", &user.token).await;
     assert_eq!(all["items"].as_array().map(Vec::len), Some(4));
     assert_eq!(all["items"][0]["kind"], "ride");
 
     let (_, runs) = app
-        .get("/api/v1/activities?kind=run&limit=2", &user.token)
+        .get("/api/v1/train/activities?kind=run&limit=2", &user.token)
         .await;
     assert_eq!(runs["items"].as_array().map(Vec::len), Some(2));
     let cursor = runs["next_cursor"].as_str().expect("next page");
     let (_, rest) = app
         .get(
-            &format!("/api/v1/activities?kind=run&limit=2&cursor={cursor}"),
+            &format!("/api/v1/train/activities?kind=run&limit=2&cursor={cursor}"),
             &user.token,
         )
         .await;

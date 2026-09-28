@@ -61,7 +61,7 @@ async fn log_training(app: &TestApp, user: &TestUser) {
     finished["notes"] = json!("private workout note");
     let (status, body) = app
         .put(
-            &format!("/api/v1/workouts/{}", uuid()),
+            &format!("/api/v1/train/workouts/{}", uuid()),
             &user.token,
             finished,
         )
@@ -70,7 +70,7 @@ async fn log_training(app: &TestApp, user: &TestUser) {
 
     let in_progress = workout(&bench, "2026-09-22T17:00:00Z", None, 1);
     app.put(
-        &format!("/api/v1/workouts/{}", uuid()),
+        &format!("/api/v1/train/workouts/{}", uuid()),
         &user.token,
         in_progress,
     )
@@ -80,7 +80,7 @@ async fn log_training(app: &TestApp, user: &TestUser) {
     activity["notes"] = json!("private run note");
     let (status, body) = app
         .put(
-            &format!("/api/v1/activities/{}", uuid()),
+            &format!("/api/v1/train/activities/{}", uuid()),
             &user.token,
             activity,
         )
