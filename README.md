@@ -116,6 +116,36 @@ Only the expired invite is back-dated in SQL, because the API only takes expiry 
 
 An integration test seeds a fresh `sqlx::test` database twice and resets it, so the fixtures fail in CI rather than on a laptop when the schema or an endpoint changes.
 
+### Open Food Facts products
+
+FitHealth's barcode scan and product search use a copy of [Open Food Facts](https://world.openfoodfacts.org) in `off_products` (ODbL: the app credits Open Food Facts wherever the data is shown).
+It is imported once from OFF's CSV export and never fetched at runtime.
+Products with a barcode and a name are kept, with or without nutrition; search only offers the ones with nutrition.
+
+Import the export into the local fixture database (about 5 minutes for the ~13 GB file, 4 M products):
+
+```bash
+FITTUNE_DATABASE_URL=postgres://fittune:fittune@localhost:5432/fittune_dev \
+  cargo run --release -- import-off /path/to/en.openfoodfacts.org.products.csv
+```
+
+The import replaces the table in one transaction, so running it again with a newer export is safe.
+Production gets the finished table instead of re-running the import:
+
+```bash
+# local: dump only the imported rows
+docker exec fittune-api-fittune-postgres-1 \
+  pg_dump -U fittune -d fittune_dev --data-only --table=off_products -Fc -Z 9 > off_products.dump
+scp off_products.dump vps:/tmp/
+
+# VPS: the API release with the off_products migration must be running first
+cd /srv/fittune/api   # where docker-compose.prod.yml lives
+docker compose -f docker-compose.prod.yml exec -T fittune-postgres \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "TRUNCATE off_products" &&
+         pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --data-only --single-transaction' < /tmp/off_products.dump
+rm /tmp/off_products.dump
+```
+
 ## Configuration
 
 | Variable | Default | Purpose |

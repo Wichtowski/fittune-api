@@ -4,9 +4,20 @@ use uuid::Uuid;
 
 use crate::{
     error::{ApiResult, FieldErrors},
-    health::nutrients::Nutrients,
+    health::{barcode, nutrients::Nutrients},
     validate,
 };
+
+/// Where a product's values came from
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "text", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum ProductSource {
+    #[default]
+    Manual,
+    /// Confirmed from an Open Food Facts listing
+    Off,
+}
 
 /// A food in the shared database
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
@@ -35,6 +46,10 @@ pub struct ProductRequest {
     pub serving_g: Option<f64>,
     #[serde(default)]
     pub serving_name: Option<String>,
+    #[serde(default)]
+    pub barcode: Option<String>,
+    #[serde(default)]
+    pub source: ProductSource,
 }
 
 impl ProductRequest {
@@ -50,6 +65,17 @@ impl ProductRequest {
         );
         validate::finite_in_range(&mut errors, "serving_g", self.serving_g, 0.1, 2000.0);
         self.per_100g.check(&mut errors, "per_100g");
+        if let Some(code) = self
+            .barcode
+            .as_deref()
+            .map(str::trim)
+            .filter(|c| !c.is_empty())
+        {
+            self.barcode = barcode::normalize(code);
+            errors.ensure(self.barcode.is_some(), "barcode", "Not a valid barcode");
+        } else {
+            self.barcode = None;
+        }
         errors.into_result()?;
         Ok(self)
     }
@@ -65,4 +91,78 @@ pub struct SearchQuery {
 
 fn default_limit() -> i64 {
     20
+}
+
+/// An Open Food Facts listing that is not a FitHealth product yet; confirming it creates one.
+/// `per_100g` is missing when OFF has no usable nutrition values for it
+#[derive(Debug, Clone, Serialize)]
+pub struct Candidate {
+    pub barcode: String,
+    pub name: String,
+    pub brand: Option<String>,
+    pub main_category: Option<String>,
+    pub per_100g: Option<Nutrients>,
+    pub serving_g: Option<f64>,
+    pub serving_name: Option<String>,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+pub struct CandidateRow {
+    pub barcode: String,
+    pub name: String,
+    pub brand: Option<String>,
+    pub main_category: Option<String>,
+    pub energy_kcal: Option<f64>,
+    pub protein_g: Option<f64>,
+    pub fat_g: Option<f64>,
+    pub carbs_g: Option<f64>,
+    pub saturated_fat_g: Option<f64>,
+    pub sugars_g: Option<f64>,
+    pub fiber_g: Option<f64>,
+    pub salt_g: Option<f64>,
+    pub serving_g: Option<f64>,
+    pub serving_name: Option<String>,
+}
+
+impl From<CandidateRow> for Candidate {
+    fn from(row: CandidateRow) -> Self {
+        let per_100g = match (row.energy_kcal, row.protein_g, row.fat_g, row.carbs_g) {
+            (Some(energy_kcal), Some(protein_g), Some(fat_g), Some(carbs_g)) => Some(Nutrients {
+                energy_kcal,
+                protein_g,
+                fat_g,
+                carbs_g,
+                saturated_fat_g: row.saturated_fat_g,
+                sugars_g: row.sugars_g,
+                fiber_g: row.fiber_g,
+                salt_g: row.salt_g,
+            }),
+            _ => None,
+        };
+        Self {
+            barcode: row.barcode,
+            name: row.name,
+            brand: row.brand,
+            main_category: row.main_category,
+            per_100g,
+            serving_g: row.serving_g,
+            serving_name: row.serving_name,
+        }
+    }
+}
+
+/// What a scanned barcode is: a FitHealth product, an OFF listing to confirm, or unknown
+#[derive(Debug, Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum Lookup {
+    Found { product: Product },
+    Off { candidate: Candidate },
+    NotFound,
+}
+
+/// FitHealth products first, then OFF listings nobody has confirmed yet
+#[derive(Debug, Serialize)]
+pub struct SearchResults {
+    pub products: Vec<Product>,
+    pub off: Vec<Candidate>,
 }

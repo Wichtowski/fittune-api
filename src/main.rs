@@ -21,7 +21,7 @@ use fittune_api::{
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
-const USAGE: &str = "usage: fittune-api [serve | migrate | healthcheck | create-admin <username> <email> | grant-admin <username-or-email>]";
+const USAGE: &str = "usage: fittune-api [serve | migrate | healthcheck | create-admin <username> <email> | grant-admin <username-or-email> | import-off <openfoodfacts.csv>]";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -45,10 +45,36 @@ async fn main() -> Result<()> {
         ["healthcheck"] => healthcheck(),
         ["create-admin", username, email] => create_admin(username, email).await,
         ["grant-admin", login] => grant_admin(login).await,
+        ["import-off", path] => import_off(path).await,
         #[cfg(feature = "dev-fixtures")]
         ["seed-dev", flags @ ..] => seed_dev::run(flags).await,
         _ => bail!("{USAGE}"),
     }
+}
+
+/// Loads Open Food Facts' CSV export into `off_products`, replacing what was there
+async fn import_off(path: &str) -> Result<()> {
+    let config = Config::from_env()?;
+    init_tracing(config.log_format);
+    let pool = db::connect(&config.database_url, 2).await?;
+    db::migrate(&pool).await?;
+    let started = std::time::Instant::now();
+    let summary =
+        fittune_api::health::off::import::import_file(&pool, std::path::Path::new(path)).await?;
+    let skipped = |skip| summary.skipped.get(&skip).copied().unwrap_or(0);
+    use fittune_api::health::off::row::Skip;
+    println!(
+        "Imported {} products ({} without nutrition) from {} lines in {:.0?}; skipped: {} bad barcode, {} without a name, {} malformed; {} duplicate listings merged",
+        summary.stored,
+        summary.without_nutrition,
+        summary.read,
+        started.elapsed(),
+        skipped(Skip::Barcode),
+        skipped(Skip::Name),
+        skipped(Skip::Malformed),
+        summary.kept - summary.stored,
+    );
+    Ok(())
 }
 
 async fn serve(config: Config) -> Result<()> {

@@ -1,7 +1,7 @@
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
-use super::model::{Product, ProductRequest};
+use super::model::{Candidate, CandidateRow, Product, ProductRequest};
 
 /// Column list shared by the queries below; a macro so `concat!` can splice it into literal SQL
 macro_rules! product_columns {
@@ -12,26 +12,93 @@ macro_rules! product_columns {
     };
 }
 
-/// Name or brand contains `query`; what the caller logged most recently comes first
+/// Column list for [`CandidateRow`]
+macro_rules! candidate_columns {
+    () => {
+        "o.barcode, o.name, o.brand, o.main_category, o.energy_kcal, o.protein_g, o.fat_g, o.carbs_g,
+        o.saturated_fat_g, o.sugars_g, o.fiber_g, o.salt_g, o.serving_g, o.serving_name"
+    };
+}
+
+/// How loosely a typed word may match a word in a name; lower than pg_trgm's 0.6 so a typo or a
+/// missing Polish letter ("platki" for "płatki") still matches
+const WORD_SIMILARITY: &str = "SET LOCAL pg_trgm.word_similarity_threshold = 0.4";
+
+/// Name or brand contains `query` or nearly matches it; what the caller logged most recently
+/// comes first, then the closest match
 pub async fn search(
-    db: &PgPool,
+    conn: &mut PgConnection,
     user_id: Uuid,
     query: &str,
     limit: i64,
 ) -> sqlx::Result<Vec<Product>> {
-    sqlx::query_as(concat!("SELECT ", product_columns!(), " FROM food_products p
+    sqlx::query(WORD_SIMILARITY).execute(&mut *conn).await?;
+    sqlx::query_as(concat!(
+        "SELECT ", product_columns!(), " FROM food_products p
          LEFT JOIN LATERAL (
             SELECT max(e.created_at) AS last_used FROM diary_entries e
             WHERE e.user_id = $1 AND e.product_id = p.id
          ) used ON true
-         WHERE $2 = '' OR strpos(lower(p.name), lower($2)) > 0 OR strpos(lower(coalesce(p.brand, '')), lower($2)) > 0
-         ORDER BY used.last_used DESC NULLS LAST, lower(p.name), p.id
-         LIMIT $3"))
+         WHERE $2 = ''
+            OR strpos(lower(p.name), lower($2)) > 0 OR strpos(lower(coalesce(p.brand, '')), lower($2)) > 0
+            OR lower($2) <% lower(p.name) OR lower($2) <% lower(p.brand)
+         ORDER BY used.last_used DESC NULLS LAST,
+            greatest(word_similarity(lower($2), lower(p.name)), word_similarity(lower($2), lower(coalesce(p.brand, '')))) DESC,
+            lower(p.name), p.id
+         LIMIT $3"
+    ))
     .bind(user_id)
     .bind(query)
     .bind(limit)
-    .fetch_all(db)
+    .fetch_all(&mut *conn)
     .await
+}
+
+/// Imported OFF listings that can be logged (they have nutrition) and are not FitHealth
+/// products yet, closest match first
+pub async fn search_off(
+    conn: &mut PgConnection,
+    query: &str,
+    limit: i64,
+) -> sqlx::Result<Vec<Candidate>> {
+    sqlx::query(WORD_SIMILARITY).execute(&mut *conn).await?;
+    let rows: Vec<CandidateRow> = sqlx::query_as(concat!(
+        "SELECT ", candidate_columns!(), " FROM off_products o
+         WHERE o.energy_kcal IS NOT NULL
+            AND (lower($1) <% lower(o.name) OR lower($1) <% lower(o.brand))
+            AND NOT EXISTS (SELECT 1 FROM food_products f WHERE f.barcode = o.barcode)
+         ORDER BY greatest(word_similarity(lower($1), lower(o.name)), word_similarity(lower($1), lower(coalesce(o.brand, '')))) DESC,
+            lower(o.name), o.barcode
+         LIMIT $2"
+    ))
+    .bind(query)
+    .bind(limit)
+    .fetch_all(conn)
+    .await?;
+    Ok(rows.into_iter().map(Candidate::from).collect())
+}
+
+pub async fn by_barcode(db: &PgPool, barcode: &str) -> sqlx::Result<Option<Product>> {
+    sqlx::query_as(concat!(
+        "SELECT ",
+        product_columns!(),
+        " FROM food_products p WHERE p.barcode = $1"
+    ))
+    .bind(barcode)
+    .fetch_optional(db)
+    .await
+}
+
+pub async fn off_by_barcode(db: &PgPool, barcode: &str) -> sqlx::Result<Option<Candidate>> {
+    let row: Option<CandidateRow> = sqlx::query_as(concat!(
+        "SELECT ",
+        candidate_columns!(),
+        " FROM off_products o WHERE o.barcode = $1"
+    ))
+    .bind(barcode)
+    .fetch_optional(db)
+    .await?;
+    Ok(row.map(Candidate::from))
 }
 
 pub async fn get(db: &PgPool, id: Uuid) -> sqlx::Result<Option<Product>> {
@@ -49,8 +116,9 @@ pub async fn create(db: &PgPool, user_id: Uuid, input: &ProductRequest) -> sqlx:
     let n = &input.per_100g;
     sqlx::query_as(concat!("WITH p AS (
             INSERT INTO food_products (id, name, brand, energy_kcal, protein_g, fat_g, carbs_g,
-                saturated_fat_g, sugars_g, fiber_g, salt_g, serving_g, serving_name, created_by, updated_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
+                saturated_fat_g, sugars_g, fiber_g, salt_g, serving_g, serving_name, created_by, updated_by,
+                barcode, source)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14, $15, $16)
             RETURNING *
          ) SELECT ", product_columns!(), " FROM p"))
     .bind(Uuid::new_v4())
@@ -67,6 +135,8 @@ pub async fn create(db: &PgPool, user_id: Uuid, input: &ProductRequest) -> sqlx:
     .bind(input.serving_g)
     .bind(&input.serving_name)
     .bind(user_id)
+    .bind(&input.barcode)
+    .bind(input.source)
     .fetch_one(db)
     .await
 }
@@ -82,7 +152,8 @@ pub async fn update(
     sqlx::query_as(concat!("WITH p AS (
             UPDATE food_products SET name = $2, brand = $3, energy_kcal = $4, protein_g = $5, fat_g = $6,
                 carbs_g = $7, saturated_fat_g = $8, sugars_g = $9, fiber_g = $10, salt_g = $11,
-                serving_g = $12, serving_name = $13, updated_by = $14, updated_at = now()
+                serving_g = $12, serving_name = $13, updated_by = $14, updated_at = now(),
+                barcode = COALESCE($15, barcode)
             WHERE id = $1
             RETURNING *
          ) SELECT ", product_columns!(), " FROM p"))
@@ -100,6 +171,7 @@ pub async fn update(
     .bind(input.serving_g)
     .bind(&input.serving_name)
     .bind(user_id)
+    .bind(&input.barcode)
     .fetch_optional(db)
     .await
 }
