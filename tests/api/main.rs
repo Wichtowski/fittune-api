@@ -9,6 +9,7 @@ mod exercises;
 #[cfg(feature = "dev-fixtures")]
 mod fixtures;
 mod friends;
+mod health;
 mod invites;
 mod namespaces;
 mod photos;

@@ -42,8 +42,19 @@ Prerequisites: Rust 1.94 (pinned in `rust-toolchain.toml`) and Docker Compose (o
 ```bash
 cp .env.example .env
 make up        # Postgres on localhost:5432 and private RustFS on localhost:9000
-make run       # API on http://localhost:4733, applies migrations
+make run       # API on http://api-fittune.local:4733, applies migrations
 ```
+
+The API listens on `0.0.0.0:4733` (`FITTUNE_BIND_ADDR`), and the app runs on `http://fittune.local:4734`.
+Fixed, uncommon ports plus named hosts avoid clashes with other local apps on 3000, 5173 or 8080.
+Add both names to `/etc/hosts` once (needs `sudo`):
+
+```text
+127.0.0.1  fittune.local api-fittune.local
+```
+
+`FITTUNE_CORS_ORIGINS` in `.env.example` allows `http://fittune.local:4734` (and `localhost:4734`); copy that line into an existing `.env` created before the change.
+`localhost:4733` keeps working for curl and tests, the host name only matters for the browser.
 
 ```bash
 make test      # unit + integration tests (uses DATABASE_URL from .env)
@@ -75,7 +86,7 @@ One command gives a local database with realistic data, so the app does not star
 
 ```bash
 make up && make seed   # creates fittune_dev, applies migrations, seeds it
-make run-fixtures      # API on :4733 against fittune_dev
+make run-fixtures      # API on http://api-fittune.local:4733 against fittune_dev
 ```
 
 Fixtures go into their own database, `FITTUNE_FIXTURES_DATABASE_URL` (`fittune_dev` in `.env.example`), never the one `make run` uses and never the `DATABASE_URL` that tests create their databases from.
