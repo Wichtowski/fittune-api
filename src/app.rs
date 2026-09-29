@@ -31,6 +31,14 @@ const MAX_BODY_BYTES: usize = 1024 * 1024;
 const INVITE_FAILURES_PER_WINDOW: u32 = 10;
 const INVITE_FAILURE_WINDOW: Duration = Duration::from_secs(15 * 60);
 
+/// Failed password checks (login, password change, account deletion) allowed per key in each window
+const LOGIN_FAILURES_PER_WINDOW: u32 = 10;
+const LOGIN_FAILURE_WINDOW: Duration = Duration::from_secs(15 * 60);
+
+/// Open registrations allowed per client in each window
+const REGISTRATIONS_PER_WINDOW: u32 = 30;
+const REGISTRATION_WINDOW: Duration = Duration::from_secs(60 * 60);
+
 /// Username lookups and friend requests allowed per user each hour. The app serves a small
 /// invited group, so this only stops a runaway client
 const FRIEND_ACTIONS_PER_WINDOW: u32 = 300;
@@ -43,6 +51,8 @@ pub struct AppState {
     pub photos: Option<Arc<dyn photos::PhotoStore>>,
     pub invite_attempts: Arc<RateLimiter>,
     pub friend_actions: Arc<RateLimiter>,
+    pub login_attempts: Arc<RateLimiter>,
+    pub registration_attempts: Arc<RateLimiter>,
 }
 
 impl AppState {
@@ -61,6 +71,14 @@ impl AppState {
             friend_actions: Arc::new(RateLimiter::new(
                 FRIEND_ACTIONS_PER_WINDOW,
                 FRIEND_ACTION_WINDOW,
+            )),
+            login_attempts: Arc::new(RateLimiter::new(
+                LOGIN_FAILURES_PER_WINDOW,
+                LOGIN_FAILURE_WINDOW,
+            )),
+            registration_attempts: Arc::new(RateLimiter::new(
+                REGISTRATIONS_PER_WINDOW,
+                REGISTRATION_WINDOW,
             )),
         }
     }
