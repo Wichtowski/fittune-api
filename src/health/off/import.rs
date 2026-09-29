@@ -107,8 +107,8 @@ async fn copy_chunk(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, chunk: &str)
     let mut copy = tx
         .copy_in_raw(
             "COPY off_staging (barcode, name, brand, main_category, energy_kcal, protein_g, fat_g,
-                carbs_g, saturated_fat_g, sugars_g, fiber_g, salt_g, serving_g, serving_name,
-                off_modified_at) FROM STDIN",
+                carbs_g, saturated_fat_g, sugars_g, fiber_g, salt_g, serving_amount, serving_name,
+                off_modified_at, unit) FROM STDIN",
         )
         .await?;
     copy.send(chunk.as_bytes()).await?;
@@ -119,7 +119,7 @@ async fn copy_chunk(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, chunk: &str)
 /// One row in `COPY ... FROM STDIN` text format: tab separated, `\N` for null
 fn write_copy_line(out: &mut String, product: &OffRow) {
     let n = product.nutrients;
-    let fields: [Option<String>; 15] = [
+    let fields: [Option<String>; 16] = [
         Some(product.barcode.clone()),
         Some(product.name.clone()),
         product.brand.clone(),
@@ -132,9 +132,10 @@ fn write_copy_line(out: &mut String, product: &OffRow) {
         n.and_then(|n| n.sugars_g).map(|v| v.to_string()),
         n.and_then(|n| n.fiber_g).map(|v| v.to_string()),
         n.and_then(|n| n.salt_g).map(|v| v.to_string()),
-        product.serving_g.map(|v| v.to_string()),
+        product.serving_amount.map(|v| v.to_string()),
         product.serving_name.clone(),
         product.modified_at.map(|t| t.to_rfc3339()),
+        Some(product.unit.as_str().to_owned()),
     ];
     for (i, field) in fields.iter().enumerate() {
         if i > 0 {
