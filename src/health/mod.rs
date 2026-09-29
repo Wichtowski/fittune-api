@@ -1,5 +1,8 @@
-//! FitHealth: nutrition endpoints, mounted under `/api/v1/health`. Empty until the food diary
-//! lands; unknown paths fall through to the API's JSON not found error
+//! FitHealth: nutrition endpoints, mounted under `/api/v1/health`. Unknown paths fall through
+//! to the API's JSON not found error
+
+pub mod exercise;
+pub mod targets;
 
 use axum::Router;
 
