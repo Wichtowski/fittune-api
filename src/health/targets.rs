@@ -159,7 +159,7 @@ mod tests {
 
     #[test]
     fn maintenance_is_bmr_times_daily_life() {
-        let t = daily(Some(&body()), Overrides::default(), 0.0).unwrap();
+        let t = daily(Some(&body()), Overrides::default(), 0.0).expect("targets");
         assert!(close(t.energy_kcal, 1780.0 * 1.55));
         assert!(close(t.training_kcal, 0.0));
     }
@@ -171,7 +171,7 @@ mod tests {
             pace_kg_per_week: 0.5,
             ..body()
         };
-        let t = daily(Some(&losing), Overrides::default(), 0.0).unwrap();
+        let t = daily(Some(&losing), Overrides::default(), 0.0).expect("targets");
         assert!(close(t.energy_kcal, 1780.0 * 1.55 - 550.0));
         // Losing keeps more protein
         assert!(close(t.protein_g, 160.0));
@@ -184,7 +184,7 @@ mod tests {
             pace_kg_per_week: 0.25,
             ..body()
         };
-        let t = daily(Some(&gaining), Overrides::default(), 0.0).unwrap();
+        let t = daily(Some(&gaining), Overrides::default(), 0.0).expect("targets");
         assert!(close(t.energy_kcal, 1780.0 * 1.55 + 275.0));
         assert!(close(t.protein_g, 144.0));
     }
@@ -200,13 +200,13 @@ mod tests {
             pace_kg_per_week: 1.0,
             ..body()
         };
-        let t = daily(Some(&small), Overrides::default(), 300.0).unwrap();
+        let t = daily(Some(&small), Overrides::default(), 300.0).expect("targets");
         assert!(close(t.energy_kcal, MIN_KCAL + 300.0));
     }
 
     #[test]
     fn macros_split_protein_fat_then_carbs() {
-        let t = daily(Some(&body()), Overrides::default(), 0.0).unwrap();
+        let t = daily(Some(&body()), Overrides::default(), 0.0).expect("targets");
         let kcal = 1780.0 * 1.55;
         assert!(close(t.protein_g, 144.0));
         assert!(close(t.fat_g, kcal * 0.25 / 9.0));
@@ -222,15 +222,15 @@ mod tests {
             pace_kg_per_week: 1.0,
             ..body()
         };
-        let t = daily(Some(&heavy), Overrides::default(), 0.0).unwrap();
+        let t = daily(Some(&heavy), Overrides::default(), 0.0).expect("targets");
         assert!(t.fat_g >= 0.6 * 150.0 - 0.01);
         assert!(t.carbs_g >= 0.0);
     }
 
     #[test]
     fn training_goes_to_calories_and_carbs() {
-        let rest = daily(Some(&body()), Overrides::default(), 0.0).unwrap();
-        let trained = daily(Some(&body()), Overrides::default(), 400.0).unwrap();
+        let rest = daily(Some(&body()), Overrides::default(), 0.0).expect("targets");
+        let trained = daily(Some(&body()), Overrides::default(), 400.0).expect("targets");
         assert!(close(trained.energy_kcal, rest.energy_kcal + 400.0));
         assert!(close(trained.carbs_g, rest.carbs_g + 100.0));
         assert!(close(trained.protein_g, rest.protein_g));
@@ -243,7 +243,7 @@ mod tests {
             energy_kcal: Some(2000.0),
             ..Overrides::default()
         };
-        let t = daily(Some(&body()), overrides, 200.0).unwrap();
+        let t = daily(Some(&body()), overrides, 200.0).expect("targets");
         assert!(close(t.energy_kcal, 2200.0));
         assert!(close(t.fat_g, 2000.0 * 0.25 / 9.0));
         assert!(close(
@@ -260,7 +260,7 @@ mod tests {
             carbs_g: Some(150.0),
             ..Overrides::default()
         };
-        let t = daily(Some(&body()), overrides, 100.0).unwrap();
+        let t = daily(Some(&body()), overrides, 100.0).expect("targets");
         assert!(close(t.protein_g, 200.0));
         assert!(close(t.fat_g, 70.0));
         // An explicit carb target still grows with training
@@ -275,7 +275,7 @@ mod tests {
             protein_g: Some(150.0),
             ..Overrides::default()
         };
-        let t = daily(None, overrides, 300.0).unwrap();
+        let t = daily(None, overrides, 300.0).expect("targets");
         assert!(close(t.energy_kcal, 2400.0));
         assert!(close(t.protein_g, 150.0));
         // Fat falls back to a quarter of the energy target without a weight

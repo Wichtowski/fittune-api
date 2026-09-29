@@ -408,3 +408,32 @@ FeedEntry { "user": PublicUser, "type": "activity", "id": "uuid", "kind": "run",
 | Playlists (model only, never routed)        | Routines |
 | 30-minute JWTs, token also in a cookie      | Opaque bearer sessions stored hashed server-side |
 | Roles `user` / `admin` / `superadmin`       | `user` / `admin` (`superadmin` had no distinct permission) |
+
+## FitHealth (`/api/v1/health`)
+
+Nutrition values are per 100 g. Diary days are the user's local date; pass `tz` (IANA name) like the stats endpoints.
+
+| Method | Path | Result |
+| --- | --- | --- |
+| GET | `/api/v1/health/products?q=&limit=20` | `Product[]`: name or brand contains `q`, the caller's recently logged products first |
+| GET | `/api/v1/health/products/{id}` | `Product` |
+| POST | `/api/v1/health/products` | `201 Product`; products are shared by all users |
+| PUT | `/api/v1/health/products/{id}` | `Product`; any user may correct a product |
+| GET | `/api/v1/health/meals` | `Meal[]` in order; creates the default meals on first use |
+| POST | `/api/v1/health/meals` | `201 Meal`, `{ name }`, at most 10 |
+| PATCH | `/api/v1/health/meals/{id}` | `Meal`, `{ name }` |
+| PUT | `/api/v1/health/meals/order` | `Meal[]`, `{ ids }` listing every active meal once |
+| DELETE | `/api/v1/health/meals/{id}` | `204`; archives, past entries keep it; `409` for the last meal |
+| GET | `/api/v1/health/days/{date}?tz=` | `Day`: meals with entries and totals, day totals, targets, training, weight, `missing` |
+| PUT | `/api/v1/health/entries/{id}` | `201` or `200 Entry`, `{ date, meal_id, product_id, grams }` |
+| DELETE | `/api/v1/health/entries/{id}` | `204` |
+| GET | `/api/v1/health/profile` | `Profile`, all fields `null` before setup |
+| PUT | `/api/v1/health/profile` | `Profile`: `sex`, `height_cm`, `activity`, `goal`, `pace_kg_per_week`, optional overrides `energy_kcal`, `protein_g`, `fat_g`, `carbs_g` |
+| GET | `/api/v1/health/weights?limit=30` | `Weight[]`, newest first |
+| PUT | `/api/v1/health/weights/{date}` | `Weight`, `{ weight_kg }` |
+| DELETE | `/api/v1/health/weights/{date}` | `204` |
+
+- Entries copy the product's name and values when logged, so later product edits do not change past days
+- Targets use Mifflin-St Jeor with a daily-life factor, the goal pace (7700 kcal per kg) and a 1200 kcal floor, then add the day's FitTune training: recorded activity calories, or `(MET - 1) * kg * hours` from activity kind or running speed, and 5 MET for finished workouts (at most 3 hours)
+- `activity` in the profile describes daily life without exercise, since training is added per day
+- `missing` lists what stops targets from being calculated: `profile`, `birthday` (set through `PATCH /api/v1/me`), `weight`

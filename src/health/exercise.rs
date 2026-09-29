@@ -110,16 +110,19 @@ mod tests {
     fn running_uses_speed() {
         // 10 km in an hour is about 10 MET, net 9
         let run = session(ActivityKind::Run, 60, Some(10.0));
-        assert!(close(activity_kcal(&run, Some(70.0)).unwrap(), 9.0 * 70.0));
+        assert!(close(
+            activity_kcal(&run, Some(70.0)).expect("estimate"),
+            9.0 * 70.0
+        ));
         // Speed is clamped, a GPS glitch cannot claim 40 km/h
         let glitch = session(ActivityKind::Run, 30, Some(20.0));
         assert!(close(
-            activity_kcal(&glitch, Some(70.0)).unwrap(),
+            activity_kcal(&glitch, Some(70.0)).expect("estimate"),
             17.0 * 70.0 * 0.5
         ));
         let no_distance = session(ActivityKind::Run, 60, None);
         assert!(close(
-            activity_kcal(&no_distance, Some(70.0)).unwrap(),
+            activity_kcal(&no_distance, Some(70.0)).expect("estimate"),
             8.8 * 70.0
         ));
     }
@@ -134,7 +137,7 @@ mod tests {
             (ActivityKind::Row, 7.0),
             (ActivityKind::Other, 5.0),
         ] {
-            let kcal = activity_kcal(&session(kind, 30, Some(5.0)), Some(80.0)).unwrap();
+            let kcal = activity_kcal(&session(kind, 30, Some(5.0)), Some(80.0)).expect("estimate");
             assert!(close(kcal, (met - 1.0) * 80.0 * 0.5), "{kind:?}");
         }
     }
@@ -150,9 +153,12 @@ mod tests {
 
     #[test]
     fn workouts_count_as_vigorous_effort_capped_at_three_hours() {
-        assert!(close(workout_kcal(3600.0, Some(80.0)).unwrap(), 4.0 * 80.0));
         assert!(close(
-            workout_kcal(5.0 * 3600.0, Some(80.0)).unwrap(),
+            workout_kcal(3600.0, Some(80.0)).expect("estimate"),
+            4.0 * 80.0
+        ));
+        assert!(close(
+            workout_kcal(5.0 * 3600.0, Some(80.0)).expect("estimate"),
             4.0 * 80.0 * 3.0
         ));
     }
