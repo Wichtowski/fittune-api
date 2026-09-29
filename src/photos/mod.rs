@@ -278,15 +278,16 @@ async fn upload(
         .await
         .map_err(|e| ApiError::Internal(e.into()))??;
     let key = format!("photos/{}/{id}", auth.user_id());
+    let full_len = processed.full.len();
     storage
-        .put(&format!("{key}/full.jpg"), processed.full.clone())
+        .put(&format!("{key}/full.jpg"), processed.full)
         .await
         .map_err(ApiError::Internal)?;
     if let Err(err) = storage
         .put(&format!("{key}/thumb.jpg"), processed.thumb)
         .await
     {
-        let _ = storage.delete(&format!("{key}/full.jpg")).await;
+        discard_object(storage.as_ref(), &format!("{key}/full.jpg")).await;
         return Err(ApiError::Internal(err));
     }
     let inserted: Result<StoredPhoto, sqlx::Error> = sqlx::query_as(
@@ -300,7 +301,7 @@ async fn upload(
     .bind(&key)
     .bind(processed.width as i32)
     .bind(processed.height as i32)
-    .bind(processed.full.len() as i32)
+    .bind(full_len as i32)
     .fetch_one(&state.db)
     .await;
     match inserted {
@@ -311,10 +312,20 @@ async fn upload(
             {
                 return Ok((StatusCode::OK, Json(existing.public())));
             }
-            let _ = storage.delete(&format!("{key}/full.jpg")).await;
-            let _ = storage.delete(&format!("{key}/thumb.jpg")).await;
+            discard_object(storage.as_ref(), &format!("{key}/full.jpg")).await;
+            discard_object(storage.as_ref(), &format!("{key}/thumb.jpg")).await;
+            if crate::error::unique_violation(&err).is_some() {
+                return Err(ApiError::Conflict("photo id is already in use".into()));
+            }
             Err(err.into())
         }
+    }
+}
+
+/// Best-effort cleanup of an object written for an upload that failed, logging instead of failing
+async fn discard_object(storage: &dyn PhotoStore, key: &str) {
+    if let Err(error) = storage.delete(key).await {
+        tracing::warn!(key, %error, "failed to clean up photo object");
     }
 }
 

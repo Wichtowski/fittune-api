@@ -249,3 +249,34 @@ async fn photo_route_allows_more_than_json_limit_but_rejects_oversized_uploads(p
         .await;
     assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
 }
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn upload_with_an_id_owned_by_another_user_is_a_conflict(pool: PgPool) {
+    let memory = Arc::new(MemoryPhotos::default());
+    let app = TestApp::with_photos(pool, Some(memory.clone()));
+    let owner = app.register("idowner").await;
+    let stranger = app.register("idclaimer").await;
+    let url = format!("/api/v1/train/progress-photos/{}", uuid());
+    let mut body = b"--test-boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"photo.png\"\r\nContent-Type: image/png\r\n\r\n".to_vec();
+    body.extend_from_slice(&png());
+    body.extend_from_slice(b"\r\n--test-boundary--\r\n");
+    let content_type = Some("multipart/form-data; boundary=test-boundary");
+
+    let (status, _, _) = app
+        .raw(
+            Method::PUT,
+            &url,
+            Some(&owner.token),
+            content_type,
+            body.clone(),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let stored = memory.0.lock().expect("lock").len();
+
+    let (status, _, _) = app
+        .raw(Method::PUT, &url, Some(&stranger.token), content_type, body)
+        .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(memory.0.lock().expect("lock").len(), stored);
+}

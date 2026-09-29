@@ -62,3 +62,19 @@ jobs:
       # All features, so the dev fixtures are seeded into a fresh database on every change
       - name: Run tests
         run: cargo test --all-targets --all-features --locked
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      - name: Audit dependencies
+        run: cargo audit
