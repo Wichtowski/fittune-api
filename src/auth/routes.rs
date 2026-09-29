@@ -56,6 +56,9 @@ async fn register(
     headers: HeaderMap,
     Json(request): Json<RegisterRequest>,
 ) -> ApiResult<(StatusCode, axum::Json<AuthResponse>)> {
+    if !state.registration_attempts.try_record(&client) {
+        return Err(ApiError::RateLimited);
+    }
     let invite_only = state.config.registration == Registration::InviteOnly;
     if invite_only && !state.invite_attempts.allows(&client) {
         return Err(ApiError::RateLimited);
@@ -131,6 +134,7 @@ struct LoginRequest {
 
 async fn login(
     State(state): State<AppState>,
+    ClientKey(client): ClientKey,
     headers: HeaderMap,
     Json(request): Json<LoginRequest>,
 ) -> ApiResult<axum::Json<AuthResponse>> {
@@ -146,6 +150,13 @@ async fn login(
         errors.into_result()?;
     }
 
+    // Throttle per client and per account before any hashing, so guessing and CPU abuse are both bounded
+    let client_key = format!("login-ip:{client}");
+    let account_key = format!("login-account:{}", login.to_lowercase());
+    if !state.login_attempts.allows(&client_key) || !state.login_attempts.allows(&account_key) {
+        return Err(ApiError::RateLimited);
+    }
+
     let credentials: Option<(Uuid, String)> = sqlx::query_as(
         "SELECT id, password_hash FROM users WHERE lower(username) = lower($1) OR lower(email) = lower($1)",
     )
@@ -155,9 +166,13 @@ async fn login(
 
     let Some((user_id, password_hash)) = credentials else {
         password::verify_dummy(request.password).await?;
+        state.login_attempts.record(&client_key);
+        state.login_attempts.record(&account_key);
         return Err(ApiError::InvalidCredentials);
     };
     if !password::verify(request.password, password_hash).await? {
+        state.login_attempts.record(&client_key);
+        state.login_attempts.record(&account_key);
         return Err(ApiError::InvalidCredentials);
     }
 

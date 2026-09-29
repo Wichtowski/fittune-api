@@ -52,7 +52,7 @@ async fn products_are_created_validated_and_shared(pool: PgPool) {
     // Shared: another user finds and edits it
     let (status, found) = app.get("/api/v1/health/products?q=melv", &bob.token).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(found.as_array().expect("array").len(), 1);
+    assert_eq!(found["products"].as_array().expect("array").len(), 1);
     let mut edited = oats();
     edited["name"] = json!("Oat flakes, mountain");
     let uri = format!("/api/v1/health/products/{}", id(&product));
@@ -252,7 +252,7 @@ async fn search_puts_the_callers_recent_products_first(pool: PgPool) {
     create_product(&app, &user, almond).await;
 
     let (_, before) = app.get("/api/v1/health/products?q=milk", &user.token).await;
-    assert_eq!(before[0]["name"], "Almond milk");
+    assert_eq!(before["products"][0]["name"], "Almond milk");
 
     let meal = meals(&app, &user).await[0].clone();
     let body = json!({ "date": "2026-09-29", "meal_id": id(&meal), "product_id": id(&milk), "grams": 200.0 });
@@ -263,7 +263,7 @@ async fn search_puts_the_callers_recent_products_first(pool: PgPool) {
     )
     .await;
     let (_, after) = app.get("/api/v1/health/products?q=milk", &user.token).await;
-    assert_eq!(after[0]["name"], "Milk 2%");
+    assert_eq!(after["products"][0]["name"], "Milk 2%");
 }
 
 #[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]

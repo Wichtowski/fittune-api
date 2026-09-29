@@ -96,12 +96,15 @@ async fn change_password(
     Json(request): Json<ChangePasswordRequest>,
 ) -> ApiResult<StatusCode> {
     let (username, current_hash) = credentials(&state, auth.user_id()).await?;
-    if !password::verify(request.current_password, current_hash).await? {
-        return Err(ApiError::validation(
-            "current_password",
-            "Current password is incorrect",
-        ));
-    }
+    confirm_password(
+        &state,
+        auth.user_id(),
+        request.current_password,
+        current_hash,
+        "current_password",
+        "Current password is incorrect",
+    )
+    .await?;
     if let Err(message) = password::check_policy(&request.new_password, &username) {
         return Err(ApiError::validation("new_password", message));
     }
@@ -131,13 +134,40 @@ async fn delete_me(
     Json(request): Json<DeleteAccountRequest>,
 ) -> ApiResult<StatusCode> {
     let (_, current_hash) = credentials(&state, auth.user_id()).await?;
-    if !password::verify(request.password, current_hash).await? {
-        return Err(ApiError::validation("password", "Password is incorrect"));
-    }
+    confirm_password(
+        &state,
+        auth.user_id(),
+        request.password,
+        current_hash,
+        "password",
+        "Password is incorrect",
+    )
+    .await?;
     crate::photos::delete_all_for_user(&state, auth.user_id()).await?;
     repo::delete(&state.db, auth.user_id()).await?;
     tracing::info!(user_id = %auth.user_id(), "account deleted");
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Verifies a password confirmation, throttling repeated failures per user so a stolen
+/// session token cannot be used to guess the password
+async fn confirm_password(
+    state: &AppState,
+    user_id: Uuid,
+    candidate: String,
+    hash: String,
+    field: &'static str,
+    message: &'static str,
+) -> ApiResult<()> {
+    let key = format!("password-user:{user_id}");
+    if !state.login_attempts.allows(&key) {
+        return Err(ApiError::RateLimited);
+    }
+    if !password::verify(candidate, hash).await? {
+        state.login_attempts.record(&key);
+        return Err(ApiError::validation(field, message));
+    }
+    Ok(())
 }
 
 async fn credentials(state: &AppState, user_id: Uuid) -> ApiResult<(String, String)> {

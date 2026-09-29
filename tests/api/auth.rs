@@ -116,6 +116,34 @@ async fn login_accepts_username_or_email(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn login_is_throttled_after_repeated_failures(pool: PgPool) {
+    let app = TestApp::new(pool);
+    app.register("throttled").await;
+
+    for _ in 0..10 {
+        let (status, _) = app
+            .post(
+                "/api/v1/auth/login",
+                None,
+                json!({ "login": "throttled", "password": "Wrong#Pass1" }),
+            )
+            .await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+    }
+
+    // Even the correct password is refused once the limit is hit
+    let (status, body) = app
+        .post(
+            "/api/v1/auth/login",
+            None,
+            json!({ "login": "throttled", "password": PASSWORD }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(body["code"], "rate_limited");
+}
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
 async fn protected_routes_require_a_valid_token(pool: PgPool) {
     let app = TestApp::new(pool);
     let (status, body) = app.request(Method::GET, "/api/v1/me", None, None).await;
