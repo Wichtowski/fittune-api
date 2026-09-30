@@ -7,14 +7,16 @@ use sqlx::PgPool;
 
 use crate::common::{TestApp, TestUser};
 
-const HEADER: &str = "code\tlast_modified_t\tproduct_name\tbrands\tmain_category\tserving_size\tserving_quantity\tenergy_100g\tenergy-kcal_100g\tfat_100g\tsaturated-fat_100g\tcarbohydrates_100g\tsugars_100g\tfiber_100g\tproteins_100g\tsalt_100g";
+const HEADER: &str = "code\tlast_modified_t\tproduct_name\tbrands\tquantity\tmain_category\tserving_size\tserving_quantity\tenergy_100g\tenergy-kcal_100g\tfat_100g\tsaturated-fat_100g\tcarbohydrates_100g\tsugars_100g\tfiber_100g\tproteins_100g\tsalt_100g";
 
 async fn import_off(app: &TestApp) {
     let rows = [
-        "5900259127761\t1700000000\tPłatki owsiane górskie\tMelvit\ten:oat-flakes\t40 g\t40\t\t372\t7\t1.2\t60\t1\t10\t13\t0.01",
-        "4000417025005\t1700000000\tJoghurt natur\tWeihenstephan\ten:plain-yogurts\t\t\t\t66\t3.5\t2.3\t4.8\t4.8\t\t3.9\t0.12",
+        "5900259127761\t1700000000\tPłatki owsiane górskie\tMelvit\t\ten:oat-flakes\t40 g\t40\t\t372\t7\t1.2\t60\t1\t10\t13\t0.01",
+        "4000417025005\t1700000000\tJoghurt natur\tWeihenstephan\t\ten:plain-yogurts\t\t\t\t66\t3.5\t2.3\t4.8\t4.8\t\t3.9\t0.12",
+        // Sold by volume, so labelled per 100 ml
+        "5449000000996\t1700000000\tCoca-Cola\tCoca-Cola\t330 ml\ten:colas\t330 ml\t330\t\t42\t0\t0\t10.6\t10.6\t\t0\t0",
         // Known barcode, no nutrition: still useful for a scan, hidden from search
-        "96385074\t1700000000\tMystery bar\t\t\t\t\t\t\t\t\t\t\t\t\t",
+        "96385074\t1700000000\tMystery bar\t\t\t\t\t\t\t\t\t\t\t\t\t\t",
     ];
     let csv = format!("{HEADER}\n{}\n", rows.join("\n"));
     import::import_reader(&app.pool, Cursor::new(csv.into_bytes()))
@@ -49,7 +51,7 @@ async fn a_barcode_resolves_to_ours_then_the_import_then_nothing(pool: PgPool) {
     assert_eq!(off["status"], "off");
     assert_eq!(off["candidate"]["name"], "Płatki owsiane górskie");
     assert_eq!(off["candidate"]["per_100g"]["energy_kcal"], 372.0);
-    assert_eq!(off["candidate"]["serving_g"], 40.0);
+    assert_eq!(off["candidate"]["serving_amount"], 40.0);
 
     let (_, bare) = lookup(&app, &user, "96385074").await;
     assert_eq!(bare["status"], "off");
@@ -69,6 +71,21 @@ async fn a_barcode_resolves_to_ours_then_the_import_then_nothing(pool: PgPool) {
     let (_, ours) = lookup(&app, &user, "5900259127761").await;
     assert_eq!(ours["status"], "found");
     assert_eq!(ours["product"]["id"], saved["id"]);
+
+    let (_, drink) = lookup(&app, &user, "5449000000996").await;
+    assert_eq!(drink["candidate"]["unit"], "ml");
+    assert_eq!(drink["candidate"]["serving_amount"], 330.0);
+    let mut drink_product = drink["candidate"].clone();
+    drink_product["source"] = json!("off");
+    drink_product
+        .as_object_mut()
+        .expect("object")
+        .remove("main_category");
+    let (status, saved_drink) = app
+        .post("/api/v1/health/products", Some(&user.token), drink_product)
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{saved_drink}");
+    assert_eq!(saved_drink["unit"], "ml");
 
     let (_, none) = lookup(&app, &user, "4006381333931").await;
     assert_eq!(none, json!({ "status": "not_found" }));

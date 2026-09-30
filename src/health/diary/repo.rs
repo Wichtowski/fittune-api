@@ -8,7 +8,7 @@ use crate::{activities::model::ActivityKind, health::exercise::ActivitySession};
 /// Column list shared by the queries below; a macro so `concat!` can splice it into literal SQL
 macro_rules! entry_columns {
     () => {
-        "id, date, meal_id, product_id, grams, product_name, product_brand, energy_kcal,
+        "id, date, meal_id, product_id, amount, unit, product_name, product_brand, energy_kcal,
     protein_g, fat_g, carbs_g, saturated_fat_g, sugars_g, fiber_g, salt_g"
     };
 }
@@ -52,25 +52,25 @@ pub async fn save(
     let same_product = existing.is_some_and(|(_, _, product)| product == Some(input.product_id));
     let entry: Entry = if same_product {
         sqlx::query_as(concat!(
-            "UPDATE diary_entries SET date = $2, meal_id = $3, grams = $4, updated_at = now()
+            "UPDATE diary_entries SET date = $2, meal_id = $3, amount = $4, updated_at = now()
              WHERE id = $1 RETURNING ",
             entry_columns!()
         ))
         .bind(id)
         .bind(input.date)
         .bind(input.meal_id)
-        .bind(input.grams)
+        .bind(input.amount)
         .fetch_one(&mut *tx)
         .await?
     } else {
         // New entry or another product: copy the product in as it is now
-        let saved: Option<Entry> = sqlx::query_as(concat!("INSERT INTO diary_entries (id, user_id, date, meal_id, product_id, grams, product_name,
+        let saved: Option<Entry> = sqlx::query_as(concat!("INSERT INTO diary_entries (id, user_id, date, meal_id, product_id, amount, unit, product_name,
                 product_brand, energy_kcal, protein_g, fat_g, carbs_g, saturated_fat_g, sugars_g, fiber_g, salt_g)
-             SELECT $1, $2, $3, $4, p.id, $6, p.name, p.brand, p.energy_kcal, p.protein_g, p.fat_g, p.carbs_g,
+             SELECT $1, $2, $3, $4, p.id, $6, p.unit, p.name, p.brand, p.energy_kcal, p.protein_g, p.fat_g, p.carbs_g,
                 p.saturated_fat_g, p.sugars_g, p.fiber_g, p.salt_g
              FROM food_products p WHERE p.id = $5
              ON CONFLICT (id) DO UPDATE SET date = excluded.date, meal_id = excluded.meal_id,
-                product_id = excluded.product_id, grams = excluded.grams, product_name = excluded.product_name,
+                product_id = excluded.product_id, amount = excluded.amount, unit = excluded.unit, product_name = excluded.product_name,
                 product_brand = excluded.product_brand, energy_kcal = excluded.energy_kcal,
                 protein_g = excluded.protein_g, fat_g = excluded.fat_g, carbs_g = excluded.carbs_g,
                 saturated_fat_g = excluded.saturated_fat_g, sugars_g = excluded.sugars_g,
@@ -81,7 +81,7 @@ pub async fn save(
         .bind(input.date)
         .bind(input.meal_id)
         .bind(input.product_id)
-        .bind(input.grams)
+        .bind(input.amount)
         .fetch_optional(&mut *tx)
         .await?;
         let Some(saved) = saved else {

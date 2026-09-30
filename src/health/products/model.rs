@@ -4,7 +4,10 @@ use uuid::Uuid;
 
 use crate::{
     error::{ApiResult, FieldErrors},
-    health::{barcode, nutrients::Nutrients},
+    health::{
+        barcode,
+        nutrients::{Nutrients, Unit},
+    },
     validate,
 };
 
@@ -28,8 +31,9 @@ pub struct Product {
     pub barcode: Option<String>,
     #[sqlx(flatten)]
     pub per_100g: Nutrients,
-    pub serving_g: Option<f64>,
+    pub serving_amount: Option<f64>,
     pub serving_name: Option<String>,
+    pub unit: Unit,
     pub source: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -43,13 +47,15 @@ pub struct ProductRequest {
     pub brand: Option<String>,
     pub per_100g: Nutrients,
     #[serde(default)]
-    pub serving_g: Option<f64>,
+    pub serving_amount: Option<f64>,
     #[serde(default)]
     pub serving_name: Option<String>,
     #[serde(default)]
     pub barcode: Option<String>,
     #[serde(default)]
     pub source: ProductSource,
+    #[serde(default)]
+    pub unit: Unit,
 }
 
 impl ProductRequest {
@@ -63,7 +69,13 @@ impl ProductRequest {
             self.serving_name.as_deref(),
             40,
         );
-        validate::finite_in_range(&mut errors, "serving_g", self.serving_g, 0.1, 2000.0);
+        validate::finite_in_range(
+            &mut errors,
+            "serving_amount",
+            self.serving_amount,
+            0.1,
+            2000.0,
+        );
         self.per_100g.check(&mut errors, "per_100g");
         if let Some(code) = self
             .barcode
@@ -102,8 +114,9 @@ pub struct Candidate {
     pub brand: Option<String>,
     pub main_category: Option<String>,
     pub per_100g: Option<Nutrients>,
-    pub serving_g: Option<f64>,
+    pub serving_amount: Option<f64>,
     pub serving_name: Option<String>,
+    pub unit: Unit,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -120,8 +133,9 @@ pub struct CandidateRow {
     pub sugars_g: Option<f64>,
     pub fiber_g: Option<f64>,
     pub salt_g: Option<f64>,
-    pub serving_g: Option<f64>,
+    pub serving_amount: Option<f64>,
     pub serving_name: Option<String>,
+    pub unit: Unit,
 }
 
 impl From<CandidateRow> for Candidate {
@@ -145,8 +159,9 @@ impl From<CandidateRow> for Candidate {
             brand: row.brand,
             main_category: row.main_category,
             per_100g,
-            serving_g: row.serving_g,
+            serving_amount: row.serving_amount,
             serving_name: row.serving_name,
+            unit: row.unit,
         }
     }
 }

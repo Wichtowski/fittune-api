@@ -6,7 +6,28 @@ use serde::{Deserialize, Serialize};
 
 use crate::{error::FieldErrors, validate};
 
-/// Values per 100 g, as on an EU nutrition label
+/// What a product is measured in; its values are per 100 of this, amounts and servings in it
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "text", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
+pub enum Unit {
+    #[default]
+    G,
+    /// Drinks, labelled per 100 ml
+    Ml,
+}
+
+impl Unit {
+    /// Postgres text value, for the importer's `COPY` stream
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Unit::G => "g",
+            Unit::Ml => "ml",
+        }
+    }
+}
+
+/// Values per 100 g, or per 100 ml for drinks, as on an EU nutrition label
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, sqlx::FromRow)]
 #[serde(deny_unknown_fields)]
 pub struct Nutrients {
@@ -82,9 +103,9 @@ pub struct Totals {
 }
 
 impl Totals {
-    /// What `grams` of a food with `per_100g` contains
-    pub fn of(per_100g: &Nutrients, grams: f64) -> Self {
-        let f = grams / 100.0;
+    /// What `amount` (grams or millilitres, the product's unit) of a food with `per_100g` contains
+    pub fn of(per_100g: &Nutrients, amount: f64) -> Self {
+        let f = amount / 100.0;
         Self {
             energy_kcal: per_100g.energy_kcal * f,
             protein_g: per_100g.protein_g * f,

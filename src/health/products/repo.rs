@@ -7,7 +7,7 @@ use super::model::{Candidate, CandidateRow, Product, ProductRequest};
 macro_rules! product_columns {
     () => {
         "p.id, p.name, p.brand, p.barcode, p.energy_kcal, p.protein_g, p.fat_g, p.carbs_g,
-    p.saturated_fat_g, p.sugars_g, p.fiber_g, p.salt_g, p.serving_g, p.serving_name, p.source,
+    p.saturated_fat_g, p.sugars_g, p.fiber_g, p.salt_g, p.serving_amount, p.serving_name, p.unit, p.source,
     p.created_at, p.updated_at"
     };
 }
@@ -16,7 +16,7 @@ macro_rules! product_columns {
 macro_rules! candidate_columns {
     () => {
         "o.barcode, o.name, o.brand, o.main_category, o.energy_kcal, o.protein_g, o.fat_g, o.carbs_g,
-        o.saturated_fat_g, o.sugars_g, o.fiber_g, o.salt_g, o.serving_g, o.serving_name"
+        o.saturated_fat_g, o.sugars_g, o.fiber_g, o.salt_g, o.serving_amount, o.serving_name, o.unit"
     };
 }
 
@@ -116,9 +116,9 @@ pub async fn create(db: &PgPool, user_id: Uuid, input: &ProductRequest) -> sqlx:
     let n = &input.per_100g;
     sqlx::query_as(concat!("WITH p AS (
             INSERT INTO food_products (id, name, brand, energy_kcal, protein_g, fat_g, carbs_g,
-                saturated_fat_g, sugars_g, fiber_g, salt_g, serving_g, serving_name, created_by, updated_by,
-                barcode, source)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14, $15, $16)
+                saturated_fat_g, sugars_g, fiber_g, salt_g, serving_amount, serving_name, created_by, updated_by,
+                barcode, source, unit)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14, $15, $16, $17)
             RETURNING *
          ) SELECT ", product_columns!(), " FROM p"))
     .bind(Uuid::new_v4())
@@ -132,11 +132,12 @@ pub async fn create(db: &PgPool, user_id: Uuid, input: &ProductRequest) -> sqlx:
     .bind(n.sugars_g)
     .bind(n.fiber_g)
     .bind(n.salt_g)
-    .bind(input.serving_g)
+    .bind(input.serving_amount)
     .bind(&input.serving_name)
     .bind(user_id)
     .bind(&input.barcode)
     .bind(input.source)
+    .bind(input.unit)
     .fetch_one(db)
     .await
 }
@@ -152,8 +153,8 @@ pub async fn update(
     sqlx::query_as(concat!("WITH p AS (
             UPDATE food_products SET name = $2, brand = $3, energy_kcal = $4, protein_g = $5, fat_g = $6,
                 carbs_g = $7, saturated_fat_g = $8, sugars_g = $9, fiber_g = $10, salt_g = $11,
-                serving_g = $12, serving_name = $13, updated_by = $14, updated_at = now(),
-                barcode = COALESCE($15, barcode)
+                serving_amount = $12, serving_name = $13, updated_by = $14, updated_at = now(),
+                barcode = COALESCE($15, barcode), unit = $16
             WHERE id = $1
             RETURNING *
          ) SELECT ", product_columns!(), " FROM p"))
@@ -168,10 +169,11 @@ pub async fn update(
     .bind(n.sugars_g)
     .bind(n.fiber_g)
     .bind(n.salt_g)
-    .bind(input.serving_g)
+    .bind(input.serving_amount)
     .bind(&input.serving_name)
     .bind(user_id)
     .bind(&input.barcode)
+    .bind(input.unit)
     .fetch_optional(db)
     .await
 }
