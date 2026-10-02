@@ -21,6 +21,7 @@ jobs:
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
       RELEASE_VERSION: ${{ github.ref_name }}
       IMAGE: ghcr.io/wichtowski/fittune-api
+      OCR_IMAGE: ghcr.io/wichtowski/fittune-ocr
       # Unique per run, so concurrent or retried deploys never share uploaded files
       RELEASE_DIR: /tmp/fittune-release-${{ github.run_id }}-${{ github.run_attempt }}
 
@@ -33,6 +34,7 @@ jobs:
 
       - name: Build production env file
         env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           FITTUNE_PHOTOS_BUCKET: ${{ vars.FITTUNE_PHOTOS_BUCKET || 'fittune-progress-photos' }}
           FITTUNE_PHOTOS_ACCESS_KEY: ${{ secrets.FITTUNE_PHOTOS_ACCESS_KEY }}
           FITTUNE_PHOTOS_SECRET_KEY: ${{ secrets.FITTUNE_PHOTOS_SECRET_KEY }}
@@ -43,6 +45,10 @@ jobs:
 
           sed -i '/^FITTUNE_APP_VERSION=/d' .env.production
           printf '\nFITTUNE_APP_VERSION=%s\n' "${RELEASE_VERSION}" >> .env.production
+
+          # The dedicated secret is the only API key source, including when unset
+          sed -i '/^OPENAI_API_KEY=/d' .env.production
+          printf 'OPENAI_API_KEY=%s\n' "${OPENAI_API_KEY}" >> .env.production
 
           # Photo storage credentials live in their own secrets; they override ENV_PRODUCTION when set
           for name in FITTUNE_PHOTOS_BUCKET FITTUNE_PHOTOS_ACCESS_KEY FITTUNE_PHOTOS_SECRET_KEY; do
@@ -83,6 +89,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Build and push CPU OCR image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./ocr-service
+          push: true
+          tags: ${{ env.OCR_IMAGE }}:${{ env.RELEASE_VERSION }}
+          cache-from: type=gha,scope=ocr
+          cache-to: type=gha,mode=max,scope=ocr
+
       - name: Copy release files to VPS
         uses: appleboy/scp-action@v1.0.0
         with:
@@ -105,7 +120,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
           script_stop: true
-          envs: DEPLOY_PATH,RELEASE_DIR,RELEASE_VERSION,IMAGE,GHCR_USER,GHCR_TOKEN
+          envs: DEPLOY_PATH,RELEASE_DIR,RELEASE_VERSION,IMAGE,OCR_IMAGE,GHCR_USER,GHCR_TOKEN
           command_timeout: "15m"
           script: |
             set -euo pipefail
@@ -117,6 +132,7 @@ jobs:
 
             # Pull before touching the running stack, so a failed pull leaves it as it was
             docker pull "${IMAGE}:${RELEASE_VERSION}"
+            docker pull "${OCR_IMAGE}:${RELEASE_VERSION}"
 
             mkdir -p "${DEPLOY_PATH}"
             cd "${DEPLOY_PATH}"

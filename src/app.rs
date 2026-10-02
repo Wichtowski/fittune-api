@@ -46,6 +46,7 @@ const FRIEND_ACTION_WINDOW: Duration = Duration::from_secs(60 * 60);
 
 #[derive(Clone)]
 pub struct AppState {
+    pub ocr: Arc<health::ocr::Runtime>,
     pub db: PgPool,
     pub config: Arc<Config>,
     pub photos: Option<Arc<dyn photos::PhotoStore>>,
@@ -61,6 +62,7 @@ impl AppState {
             Arc::new(photos::S3PhotoStore::new(storage)) as Arc<dyn photos::PhotoStore>
         });
         Self {
+            ocr: Arc::new(health::ocr::Runtime::default()),
             db,
             config: Arc::new(config),
             photos,
@@ -89,6 +91,7 @@ pub fn router(state: AppState) -> Router {
         .nest("/auth", auth::router())
         .merge(users::router())
         .merge(invites::router())
+        .merge(crate::admin::router())
         .merge(friends::router())
         .nest("/train", train::router())
         .nest("/health", health::router())
@@ -136,7 +139,7 @@ fn cors(origins: &[String]) -> CorsLayer {
             Method::DELETE,
         ])
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
-        .expose_headers([REQUEST_ID])
+        .expose_headers([REQUEST_ID, header::RETRY_AFTER])
         .max_age(Duration::from_secs(60 * 60))
 }
 
