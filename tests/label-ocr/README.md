@@ -49,7 +49,10 @@ Tesseract uses PL+EN fast language data and sparse-text segmentation.
 The app uses original crops; thresholding is not applied unconditionally because its benefit must be demonstrated separately for each engine and language.
 Keep held-out photos out of parser and engine tuning, then evaluate the frozen configuration using `--split heldout`.
 Reports count correct populated fields, missing fields, incorrect suggestions and service failures separately.
-Comparison tolerance is 1 kcal and the greater of 0.01 g or 2 percent for nutrients.
+The current benchmark rounds expected and proposed numeric values upward to one decimal place, then accepts an absolute difference at or below 0.6 for every numeric field, including kcal.
+It removes floating-point representation noise before decimal rounding.
+Missing values and inequalities remain null, and mismatched g/ml bases still fail.
+Each new report records its scoring rule; raw values and the fixture annotations remain unchanged.
 A correct numeric value with the wrong g/ml basis does not count as correct.
 Timing includes sidecar readiness after a worker restart, with failed attempts included and counted explicitly.
 Tesseract timings measure recognition after worker initialization and language loading.
@@ -59,6 +62,8 @@ These desktop measurements do not establish mobile-device performance or actual 
 
 `baseline.json` records the engine settings, resource limits and all four development preprocessing comparisons.
 `results/` records every original-crop development and held-out result, including missing and incorrect values.
+The archived baseline and results below used the earlier strict tolerance of 1 kcal and the greater of 0.01 g or 2 percent for nutrients, before decimal correction.
+They are not directly comparable with future soft-scored runs.
 The two normalized public observations in `observations/` are real Polish/English parser regression inputs and inherit the manifest attribution and license.
 Held-out labels were evaluated after development tuning; the later kJ/kcal warning does not change extracted values.
 
@@ -77,6 +82,23 @@ Tesseract preprocessing did not produce a consistent improvement across both lan
 Original crops remain the default rather than selecting a transform based only on recall.
 The final one-CPU, 512 MiB sidecar completed 180 fixture requests without worker failures or OOMs, with a measured cgroup peak of 370491392 bytes (353.3 MiB).
 These timings and memory figures come from a Ryzen 7 3700X desktop with container CPU limits, not the production VPS or a phone.
+
+## Macro consistency correction
+
+The shared Rust parser can propose a lost-decimal correction when detected kcal and all three macros are present and the calorie reading has no uncertainty or conflict warning.
+It compares 4 kcal per gram of protein/carbohydrate and 9 kcal per gram of fat, using the existing consistency tolerance of 15 percent of detected kcal or 10 kcal, whichever is greater.
+It tries dividing one macro by 10 or 100 and accepts only one unique candidate that also passes supported ranges, total mass and parent-nutrient checks.
+The original OCR evidence is preserved, the adjustment is annotated, and the UI warns the user to confirm the printed label.
+When detected kcal exceed the original macro estimate by more than that tolerance, correction is skipped and a warning is shown.
+This is a proposal for OCR output, not a general way to infer missing nutrients, and AI extraction is not automatically rewritten.
+The energy equation is underdetermined and fibre, polyols and other energy contributors can affect the estimate.
+This heuristic needs a new fixture comparison before release; the existing baseline predates it.
+
+Run the lightweight scoring check independently when testing resumes:
+
+```sh
+python3 -m unittest discover -s tests/label-ocr -p 'test_*.py'
+```
 
 ## Release checks and later phases
 

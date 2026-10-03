@@ -107,7 +107,82 @@ impl Extraction {
         }
     }
 
+    fn repair_lost_decimal(&mut self) {
+        if self.source != "ocr" || !matches!(self.unit.as_deref(), Some("g" | "ml")) {
+            return;
+        }
+        let Some(kcal) = self.values["energy_kcal"]
+            .filter(|value| value.is_finite() && *value > 0.0 && *value <= 900.0)
+        else {
+            return;
+        };
+        if self.warnings.get("energy_kcal").is_some_and(|warnings| {
+            warnings.iter().any(|warning| {
+                !matches!(
+                    warning.as_str(),
+                    "Converted from kJ; check the label"
+                        | "Converted from a portion; confirm the portion size and unit"
+                )
+            })
+        }) {
+            return;
+        }
+        let fields = ["protein_g", "fat_g", "carbs_g"];
+        let [Some(protein), Some(fat), Some(carbs)] = fields.map(|field| self.values[field]) else {
+            return;
+        };
+        let macros = [protein, fat, carbs];
+        if macros
+            .iter()
+            .any(|value| !value.is_finite() || *value < 0.0)
+        {
+            return;
+        }
+        let estimate = 4.0 * protein + 9.0 * fat + 4.0 * carbs;
+        let tolerance = (kcal * 0.15).max(10.0);
+        if kcal - estimate > tolerance {
+            self.warn(
+                "energy_kcal",
+                "Detected kcal is above the macro estimate; automatic macro correction skipped",
+            );
+            return;
+        }
+        if estimate - kcal <= tolerance {
+            return;
+        }
+        // A calorie equation cannot identify three unknowns, so require one unique decimal-shift candidate
+        let mut candidates = Vec::new();
+        for (index, value) in macros.iter().enumerate() {
+            for divisor in [10.0, 100.0] {
+                let mut candidate = macros;
+                candidate[index] = value / divisor;
+                if candidate.iter().any(|value| *value > 100.0)
+                    || candidate.iter().sum::<f64>() > 100.0
+                    || self.values["saturated_fat_g"].is_some_and(|value| value > candidate[1])
+                    || self.values["sugars_g"].is_some_and(|value| value > candidate[2])
+                {
+                    continue;
+                }
+                let corrected_estimate =
+                    4.0 * candidate[0] + 9.0 * candidate[1] + 4.0 * candidate[2];
+                if (corrected_estimate - kcal).abs() <= tolerance {
+                    candidates.push((index, candidate[index]));
+                }
+            }
+        }
+        if let [(index, value)] = candidates.as_slice() {
+            let field = fields[*index];
+            self.values.insert(field.into(), Some(*value));
+            self.evidence
+                .entry(field.into())
+                .or_default()
+                .push_str(&format!(" [{} -> {} g]", macros[*index], value));
+            self.warn(field, "Possible lost decimal point; adjusted using the other macros and detected kcal. Confirm the label");
+        }
+    }
+
     pub fn check(&mut self) {
+        self.repair_lost_decimal();
         for field in FIELDS {
             if let Some(value) = self.values.get(field).copied().flatten() {
                 let max = if field == "energy_kcal" { 900.0 } else { 100.0 };
@@ -144,6 +219,79 @@ impl Extraction {
             {
                 self.warn("energy_kcal", "Energy differs from the macro estimate, which omits fibre, polyols and other contributors");
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn reading(kcal: f64, protein: f64, fat: f64, carbs: f64) -> Extraction {
+        let mut out = Extraction::blank("ocr");
+        out.unit = Some("g".into());
+        for (field, value) in [
+            ("energy_kcal", kcal),
+            ("protein_g", protein),
+            ("fat_g", fat),
+            ("carbs_g", carbs),
+        ] {
+            out.values.insert(field.into(), Some(value));
+        }
+        out
+    }
+
+    #[test]
+    fn repairs_only_unique_decimal_errors_with_trusted_energy() {
+        for (kcal, protein, fat, carbs, field, expected) in [
+            (107.0, 19.0, 25.0, 2.2, "fat_g", 2.5),
+            (107.0, 190.0, 2.5, 2.2, "protein_g", 19.0),
+            (314.5, 2.5, 0.5, 750.0, "carbs_g", 75.0),
+            (107.0, 19.0, 250.0, 2.2, "fat_g", 2.5),
+        ] {
+            let mut out = reading(kcal, protein, fat, carbs);
+            out.evidence
+                .insert(field.into(), "Original OCR text".into());
+            out.check();
+            assert_eq!(out.values[field], Some(expected));
+            assert!(
+                out.warnings[field]
+                    .iter()
+                    .any(|warning| warning.contains("Possible lost decimal point"))
+            );
+            assert!(out.evidence[field].starts_with("Original OCR text ["));
+        }
+        let mut high_energy = reading(500.0, 19.0, 2.5, 2.2);
+        high_energy.check();
+        assert_eq!(high_energy.values["fat_g"], Some(2.5));
+        assert!(
+            high_energy.warnings["energy_kcal"]
+                .iter()
+                .any(|warning| warning.contains("correction skipped"))
+        );
+
+        let mut ambiguous = reading(50.0, 10.0, 0.0, 10.0);
+        ambiguous.check();
+        assert_eq!(ambiguous.values["protein_g"], Some(10.0));
+        assert_eq!(ambiguous.values["carbs_g"], Some(10.0));
+
+        for scenario in ["missing", "uncertain", "parent", "ai", "invalid_energy"] {
+            let mut out = reading(107.0, 19.0, 25.0, 2.2);
+            match scenario {
+                "missing" => {
+                    out.values.insert("protein_g".into(), None);
+                }
+                "uncertain" => out.warn("energy_kcal", "Uncertain OCR reading; check the label"),
+                "parent" => {
+                    out.values.insert("saturated_fat_g".into(), Some(3.0));
+                }
+                "ai" => out.source = "ai".into(),
+                _ => {
+                    out.values.insert("energy_kcal".into(), Some(1070.0));
+                }
+            }
+            out.check();
+            assert_eq!(out.values["fat_g"], Some(25.0), "{scenario}");
         }
     }
 }

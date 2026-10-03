@@ -4,6 +4,7 @@ import io
 import json
 import math
 import time
+from decimal import Decimal, ROUND_CEILING
 from urllib.error import HTTPError
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -51,6 +52,21 @@ def request(url, body, token=None, content_type="application/json"):
         headers["Authorization"] = "Bearer " + token
     with urlopen(Request(url, data=body, headers=headers), timeout=30) as response:
         return json.load(response)
+
+
+SCORING = {"rounding": "ceiling", "decimal_places": 1, "absolute_tolerance": 0.6, "require_same_basis": True}
+
+
+def rounded(value):
+    return Decimal(str(round(value, 12))).quantize(Decimal("0.1"), rounding=ROUND_CEILING)
+
+
+def matches(expected, actual):
+    if expected is None or actual is None:
+        return expected is None and actual is None
+    if not math.isfinite(actual):
+        return False
+    return abs(rounded(expected) - rounded(actual)) <= Decimal("0.6")
 
 
 def main():
@@ -118,7 +134,7 @@ def main():
         correct = total = proposed = wrong = 0
         for field, truth in entry["expected"]["values"].items():
             actual = result["values"][field]
-            equal = actual is None if truth is None else actual is not None and abs(truth - actual) <= (1 if field == "energy_kcal" else max(.01, abs(truth) * .02))
+            equal = matches(truth, actual)
             if truth is not None:
                 total += 1
                 correct += int(equal and result["unit"] == entry["expected"]["unit"])
@@ -126,7 +142,9 @@ def main():
                 proposed += 1
                 wrong += int(not equal or result["unit"] != entry["expected"]["unit"])
             if not equal:
-                differences[field] = {"expected": truth, "actual": actual}
+                differences[field] = {"expected": truth, "actual": actual, "rounded_expected": float(rounded(truth)) if truth is not None else None, "rounded_actual": float(rounded(actual)) if actual is not None else None}
+        if result["unit"] != entry["expected"]["unit"]:
+            differences["unit"] = {"expected": entry["expected"]["unit"], "actual": result["unit"]}
         results.append({"id": entry["id"], "language": entry["language"], "split": entry["split"], "difficulty": entry["difficulty"], "seconds": elapsed, "failure":failure, "correct": correct, "total": total, "proposed": proposed, "wrong": wrong, "differences": differences, "result": result})
         print(entry["id"], f"{correct}/{total}, {wrong} incorrect suggestions", flush=True)
     if args.prepare_only: return
@@ -135,7 +153,7 @@ def main():
         rows = [r for r in results if r["language"] == lang]
         timings = sorted(r["seconds"] for r in rows if r["seconds"] is not None)
         summary[lang] = {"failed":sum(r["failure"] is not None for r in rows), "correct": sum(r["correct"] for r in rows), "total": sum(r["total"] for r in rows), "proposed": sum(r["proposed"] for r in rows), "wrong": sum(r["wrong"] for r in rows), "p95_seconds": timings[max(0, math.ceil(len(timings) * .95) - 1)] if timings else None}
-    args.report.write_text(json.dumps({"variant":args.variant,"split":args.split,"summary": summary, "results": results}, ensure_ascii=False, indent=2) + "\n")
+    args.report.write_text(json.dumps({"variant":args.variant,"split":args.split,"scoring":SCORING,"summary": summary, "results": results}, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps(summary, indent=2))
 
 
