@@ -20,6 +20,9 @@ pub const PASSWORD: &str = "Squat#Depth1";
 
 pub fn config(registration: Registration) -> Config {
     Config {
+        openai_key: None,
+        openai_endpoint: "https://api.openai.com/v1/responses".into(),
+        ocr_endpoint: None,
         database_url: String::new(),
         db_max_connections: 5,
         bind_addr: ([127, 0, 0, 1], 0).into(),
@@ -47,6 +50,11 @@ impl TestApp {
     /// Open registration, so tests can create users freely
     pub fn new(pool: PgPool) -> Self {
         Self::with_registration_and_photos(pool, Registration::Open, None)
+    }
+
+    pub fn with_config(pool: PgPool, config: Config) -> Self {
+        let router = router(AppState::new(pool.clone(), config));
+        Self { router, pool }
     }
 
     pub fn invite_only(pool: PgPool) -> Self {

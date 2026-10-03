@@ -36,6 +36,8 @@ services:
       FITTUNE_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@fittune-postgres:5432/${POSTGRES_DB}
       FITTUNE_BIND_ADDR: 0.0.0.0:4733
       FITTUNE_LOG_FORMAT: json
+      FITTUNE_OCR_ENDPOINT: http://fittune-ocr:8080
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       FITTUNE_PHOTOS_ENDPOINT: http://fittune-rustfs:9000
       # Caddy sets it to the real client IP; the API is only reachable through the edge network
       FITTUNE_CLIENT_IP_HEADER: X-Real-IP
@@ -61,6 +63,35 @@ services:
     cpus: "1.0"
     pids_limit: 256
     stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  fittune-ocr:
+    image: ghcr.io/wichtowski/fittune-ocr:${FITTUNE_APP_VERSION:?Set FITTUNE_APP_VERSION to the release tag}
+    restart: unless-stopped
+    expose:
+      - "8080"
+    networks:
+      - data_net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m
+    mem_limit: 512m
+    cpus: "1.0"
+    pids_limit: 64
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 10
     logging:
       driver: json-file
       options:

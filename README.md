@@ -157,6 +157,8 @@ rm /tmp/off_products.dump
 | `FITTUNE_SESSION_TTL_HOURS` | `720` | Idle lifetime of a session |
 | `FITTUNE_LOG_FORMAT` | `pretty` | `pretty` or `json` |
 | `FITTUNE_LOG` | `fittune_api=info,tower_http=info,sqlx=warn,info` | tracing filter |
+| `OPENAI_API_KEY` | (unset) | Optional server key from the dedicated GitHub secret; AI OCR is disabled when absent |
+| `FITTUNE_OCR_ENDPOINT` | (unset) | Private RapidOCR sidecar URL; local OCR/manual entry remain available when absent |
 | `FITTUNE_APP_VERSION` | `dev` | Reported by `/health`; set to the release tag on deploy |
 | `FITTUNE_PHOTOS_ENDPOINT` | — | RustFS S3 endpoint; photo API is unavailable when unset |
 | `FITTUNE_PHOTOS_BUCKET` | — | Private bucket, created by Compose |
@@ -255,3 +257,14 @@ Recovery:
 - Lost admin password: create another admin with `make prod-create-admin`, sign in, and change or remove the old account.
 - A code leaked: revoke it in Profile → Invites; accounts it already created stay and can be deleted by their owner.
 - Locked out by the rate limit (10 wrong codes per client in 15 minutes): wait for the window to pass, or restart the API container (`backend-control.yml`), which clears the in-memory counters.
+
+## Nutrition label OCR
+
+The shared Admin panel contains invites, users, catalogue management and the global OCR model setting.
+The default is `gpt-6-luna`; only admins can select an allowed model, and changes are persisted with the actor and timestamp.
+The deploy workflow passes the dedicated `OPENAI_API_KEY` GitHub secret into the API runtime environment; it is never part of a frontend bundle or Docker build argument.
+See [fixture validation and runtime limits](tests/label-ocr/README.md) before enabling production OCR.
+AI allows two requests per user per minute, twenty admitted attempts per UTC day and two concurrent requests globally.
+The persisted daily global ceiling is two hundred attempts; provider failures count because they may incur charges.
+Server OCR allows ten requests per user per minute and one concurrent inference globally.
+Both paths allow one extraction per user across engines, reject overload without queueing, and return `Retry-After` for manual retry.

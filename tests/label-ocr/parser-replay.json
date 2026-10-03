@@ -1,0 +1,267 @@
+{
+  "scoring": {
+    "rounding": "ceiling",
+    "decimal_places": 1,
+    "absolute_tolerance": 0.6,
+    "require_same_basis": true
+  },
+  "fixture_count": 60,
+  "printed_numeric_values": 420,
+  "manifest_sha256": "0726904120b89754fbca0fc99caa515a22639d8b7a7a40d79d3d73d19796fb30",
+  "engines": {
+    "rapid": {
+      "before": {
+        "correct": 188,
+        "total": 420,
+        "proposed": 219,
+        "wrong": 31
+      },
+      "after": {
+        "correct": 228,
+        "total": 420,
+        "proposed": 246,
+        "wrong": 18
+      },
+      "gate": {
+        "increased_correct": true,
+        "no_additional_wrong": true
+      },
+      "observations_sha256": "5e235d25a2d473c07b52171b1655fe17b361f37705a11d981984cb84095796a5",
+      "splits": {
+        "development": {
+          "before": {
+            "correct": 129,
+            "total": 274,
+            "proposed": 147,
+            "wrong": 18
+          },
+          "after": {
+            "correct": 162,
+            "total": 274,
+            "proposed": 168,
+            "wrong": 6
+          },
+          "gate": {
+            "increased_correct": true,
+            "no_additional_wrong": true
+          },
+          "by_language": {
+            "pl": {
+              "before": {
+                "correct": 59,
+                "total": 145,
+                "proposed": 69,
+                "wrong": 10
+              },
+              "after": {
+                "correct": 81,
+                "total": 145,
+                "proposed": 86,
+                "wrong": 5
+              }
+            },
+            "en": {
+              "before": {
+                "correct": 70,
+                "total": 129,
+                "proposed": 78,
+                "wrong": 8
+              },
+              "after": {
+                "correct": 81,
+                "total": 129,
+                "proposed": 82,
+                "wrong": 1
+              }
+            }
+          }
+        },
+        "heldout": {
+          "before": {
+            "correct": 59,
+            "total": 146,
+            "proposed": 72,
+            "wrong": 13
+          },
+          "after": {
+            "correct": 66,
+            "total": 146,
+            "proposed": 78,
+            "wrong": 12
+          },
+          "gate": {
+            "increased_correct": true,
+            "no_additional_wrong": true
+          },
+          "by_language": {
+            "pl": {
+              "before": {
+                "correct": 40,
+                "total": 74,
+                "proposed": 49,
+                "wrong": 9
+              },
+              "after": {
+                "correct": 42,
+                "total": 74,
+                "proposed": 50,
+                "wrong": 8
+              }
+            },
+            "en": {
+              "before": {
+                "correct": 19,
+                "total": 72,
+                "proposed": 23,
+                "wrong": 4
+              },
+              "after": {
+                "correct": 24,
+                "total": 72,
+                "proposed": 28,
+                "wrong": 4
+              }
+            }
+          }
+        }
+      },
+      "correct_coverage_percent": 54.3,
+      "proposal_precision_percent": 92.7
+    },
+    "tesseract": {
+      "before": {
+        "correct": 35,
+        "total": 420,
+        "proposed": 67,
+        "wrong": 32
+      },
+      "after": {
+        "correct": 45,
+        "total": 420,
+        "proposed": 74,
+        "wrong": 29
+      },
+      "gate": {
+        "increased_correct": true,
+        "no_additional_wrong": true
+      },
+      "observations_sha256": "491eee7146bfeda05a5ebecdea357ae47f5035d7d7ce6cf8725989befa765ae3",
+      "splits": {
+        "development": {
+          "before": {
+            "correct": 33,
+            "total": 274,
+            "proposed": 58,
+            "wrong": 25
+          },
+          "after": {
+            "correct": 42,
+            "total": 274,
+            "proposed": 62,
+            "wrong": 20
+          },
+          "gate": {
+            "increased_correct": true,
+            "no_additional_wrong": true
+          },
+          "by_language": {
+            "pl": {
+              "before": {
+                "correct": 11,
+                "total": 145,
+                "proposed": 25,
+                "wrong": 14
+              },
+              "after": {
+                "correct": 17,
+                "total": 145,
+                "proposed": 27,
+                "wrong": 10
+              }
+            },
+            "en": {
+              "before": {
+                "correct": 22,
+                "total": 129,
+                "proposed": 33,
+                "wrong": 11
+              },
+              "after": {
+                "correct": 25,
+                "total": 129,
+                "proposed": 35,
+                "wrong": 10
+              }
+            }
+          }
+        },
+        "heldout": {
+          "before": {
+            "correct": 2,
+            "total": 146,
+            "proposed": 9,
+            "wrong": 7
+          },
+          "after": {
+            "correct": 3,
+            "total": 146,
+            "proposed": 12,
+            "wrong": 9
+          },
+          "gate": {
+            "increased_correct": true,
+            "no_additional_wrong": false
+          },
+          "by_language": {
+            "pl": {
+              "before": {
+                "correct": 2,
+                "total": 74,
+                "proposed": 8,
+                "wrong": 6
+              },
+              "after": {
+                "correct": 3,
+                "total": 74,
+                "proposed": 12,
+                "wrong": 9
+              }
+            },
+            "en": {
+              "before": {
+                "correct": 0,
+                "total": 72,
+                "proposed": 1,
+                "wrong": 1
+              },
+              "after": {
+                "correct": 0,
+                "total": 72,
+                "proposed": 0,
+                "wrong": 0
+              }
+            }
+          }
+        }
+      },
+      "correct_coverage_percent": 10.7,
+      "proposal_precision_percent": 60.8
+    }
+  },
+  "notes": [
+    "Frozen parser evaluated on saved original-crop observations from the soft-scored rerun; OCR engines were not rerun",
+    "All 60 original image digests verified; annotation manifest and scoring unchanged",
+    "Development tuning used only the 40 development labels; held-out results were evaluated once after freezing",
+    "Overall correct populated values increase and incorrect suggestions decrease for both engines",
+    "Tesseract held-out Polish incorrect suggestions increase from 6 to 9; its combined held-out gate fails and remains a release blocker",
+    "No macro decimal corrections applied; gains come from header and geometry matching",
+    "Saved OCR recognition timings are unchanged and are not new device or VPS measurements"
+  ],
+  "checks": {
+    "rust_tests_passed": 197,
+    "ocr_unit_tests_passed": 15,
+    "clippy": "passed",
+    "python_soft_scoring_test": "passed",
+    "diff_check": "passed"
+  }
+}

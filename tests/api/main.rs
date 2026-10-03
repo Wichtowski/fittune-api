@@ -13,6 +13,7 @@ mod friends;
 mod health;
 mod invites;
 mod namespaces;
+mod ocr;
 mod off_import;
 mod photos;
 mod places;

@@ -1,0 +1,262 @@
+{
+  "measured_date": "2026-10-03",
+  "manifest": "manifest.json",
+  "status": "accuracy below release quality; manual review required",
+  "host": "AMD Ryzen 7 3700X Linux desktop",
+  "rapid": {
+    "version": "3.9.2",
+    "onnxruntime": "1.30.0",
+    "global_max_side_len": 960,
+    "cpus": 1,
+    "memory_limit_bytes": 536870912,
+    "memory_peak_bytes": 370491392,
+    "oom_kills": 0,
+    "worker_failures": 0,
+    "requests": 180
+  },
+  "tesseract": {
+    "version": "6.0.1",
+    "languages": "pol+eng fast",
+    "psm": 11,
+    "timing_excludes": "worker initialization and asset loading"
+  },
+  "development_comparison_and_heldout": [
+    {
+      "engine": "rapid",
+      "variant": "original",
+      "split": "development",
+      "summary": {
+        "pl": {
+          "failed": 0,
+          "correct": 57,
+          "total": 145,
+          "proposed": 69,
+          "wrong": 12,
+          "p95_seconds": 1.8043656570080202
+        },
+        "en": {
+          "failed": 0,
+          "correct": 68,
+          "total": 129,
+          "proposed": 78,
+          "wrong": 10,
+          "p95_seconds": 1.393850983993616
+        }
+      }
+    },
+    {
+      "engine": "rapid",
+      "variant": "grayscale",
+      "split": "development",
+      "summary": {
+        "pl": {
+          "failed": 0,
+          "correct": 60,
+          "total": 145,
+          "proposed": 79,
+          "wrong": 19,
+          "p95_seconds": 1.8009620730008464
+        },
+        "en": {
+          "failed": 0,
+          "correct": 69,
+          "total": 129,
+          "proposed": 81,
+          "wrong": 12,
+          "p95_seconds": 1.4674770399869885
+        }
+      }
+    },
+    {
+      "engine": "rapid",
+      "variant": "otsu",
+      "split": "development",
+      "summary": {
+        "pl": {
+          "failed": 0,
+          "correct": 30,
+          "total": 145,
+          "proposed": 44,
+          "wrong": 14,
+          "p95_seconds": 2.0652412100171205
+        },
+        "en": {
+          "failed": 0,
+          "correct": 51,
+          "total": 129,
+          "proposed": 64,
+          "wrong": 13,
+          "p95_seconds": 1.3850994679960422
+        }
+      }
+    },
+    {
+      "engine": "rapid",
+      "variant": "sauvola",
+      "split": "development",
+      "summary": {
+        "pl": {
+          "failed": 0,
+          "correct": 28,
+          "total": 145,
+          "proposed": 39,
+          "wrong": 11,
+          "p95_seconds": 1.6130170639953576
+        },
+        "en": {
+          "failed": 0,
+          "correct": 48,
+          "total": 129,
+          "proposed": 59,
+          "wrong": 11,
+          "p95_seconds": 1.3899951690109447
+        }
+      }
+    },
+    {
+      "engine": "rapid",
+      "variant": "original",
+      "split": "heldout",
+      "summary": {
+        "pl": {
+          "failed": 0,
+          "correct": 41,
+          "total": 74,
+          "proposed": 49,
+          "wrong": 8,
+          "p95_seconds": 1.8564926859980915
+        },
+        "en": {
+          "failed": 0,
+          "correct": 17,
+          "total": 72,
+          "proposed": 23,
+          "wrong": 6,
+          "p95_seconds": 1.4523327890201472
+        }
+      }
+    },
+    {
+      "engine": "tesseract",
+      "variant": "original",
+      "split": "development",
+      "summary": {
+        "pl": {
+          "failed": 0,
+          "correct": 9,
+          "total": 145,
+          "proposed": 25,
+          "wrong": 16,
+          "p95_seconds": 2.5285077370000018
+        },
+        "en": {
+          "failed": 0,
+          "correct": 19,
+          "total": 129,
+          "proposed": 33,
+          "wrong": 14,
+          "p95_seconds": 1.2233536710000044
+        }
+      }
+    },
+    {
+      "engine": "tesseract",
+      "variant": "grayscale",
+      "split": "development",
+      "summary": {
+        "pl": {
+          "failed": 0,
+          "correct": 8,
+          "total": 145,
+          "proposed": 22,
+          "wrong": 14,
+          "p95_seconds": 2.550983658000001
+        },
+        "en": {
+          "failed": 0,
+          "correct": 22,
+          "total": 129,
+          "proposed": 36,
+          "wrong": 14,
+          "p95_seconds": 1.054631547000001
+        }
+      }
+    },
+    {
+      "engine": "tesseract",
+      "variant": "otsu",
+      "split": "development",
+      "summary": {
+        "pl": {
+          "failed": 0,
+          "correct": 10,
+          "total": 145,
+          "proposed": 19,
+          "wrong": 9,
+          "p95_seconds": 2.634437749000001
+        },
+        "en": {
+          "failed": 0,
+          "correct": 21,
+          "total": 129,
+          "proposed": 36,
+          "wrong": 15,
+          "p95_seconds": 1.0134497699999994
+        }
+      }
+    },
+    {
+      "engine": "tesseract",
+      "variant": "sauvola",
+      "split": "development",
+      "summary": {
+        "pl": {
+          "failed": 0,
+          "correct": 9,
+          "total": 145,
+          "proposed": 21,
+          "wrong": 12,
+          "p95_seconds": 4.519284672999999
+        },
+        "en": {
+          "failed": 0,
+          "correct": 22,
+          "total": 129,
+          "proposed": 39,
+          "wrong": 17,
+          "p95_seconds": 1.7378758980000057
+        }
+      }
+    },
+    {
+      "engine": "tesseract",
+      "variant": "original",
+      "split": "heldout",
+      "summary": {
+        "pl": {
+          "failed": 0,
+          "correct": 2,
+          "total": 74,
+          "proposed": 8,
+          "wrong": 6,
+          "p95_seconds": 1.8554563120000003
+        },
+        "en": {
+          "failed": 0,
+          "correct": 0,
+          "total": 72,
+          "proposed": 1,
+          "wrong": 1,
+          "p95_seconds": 1.4921292439999998
+        }
+      }
+    }
+  ],
+  "pending": [
+    "paid OpenAI extraction",
+    "Pixel 6a performance and memory",
+    "actual VPS performance",
+    "production proxy and CSP",
+    "physical camera permissions and gestures"
+  ]
+}
