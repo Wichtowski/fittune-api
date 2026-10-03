@@ -23,7 +23,7 @@ Sources: [dataset](https://huggingface.co/datasets/openfoodfacts/nutrient-detect
 Restore the photos outside the checkout:
 
 ```sh
-python3 tests/label-ocr/acquire.py --output /tmp/fittune-label-fixtures
+python3 tests/label-ocr/acquire.py --output /home/oshki/Projects/fittune/data/fittune-label-fixtures
 ```
 
 The benchmark requires Pillow and NumPy, which are also installed with the OCR sidecar dependencies.
@@ -33,14 +33,14 @@ The OCR port must remain private in production.
 The optional benchmark URL is a local test port and bypasses user quotas only for this offline fixture runner.
 
 ```sh
-python3 tests/label-ocr/benchmark.py --fixtures /tmp/fittune-label-fixtures --observations /tmp/rapid-original --api http://localhost:4763 --token-file /tmp/local-fixture.token --rapid-url http://localhost:4766 --variant original --split development --report /tmp/rapid-development.json
-python3 tests/label-ocr/benchmark.py --fixtures /tmp/fittune-label-fixtures --observations /tmp/crops-original --prepare-only --variant original --split development
+python3 tests/label-ocr/benchmark.py --fixtures /home/oshki/Projects/fittune/data/fittune-label-fixtures --observations /home/oshki/Projects/fittune/data/rapid-original --api http://localhost:4763 --token-file /home/oshki/Projects/fittune/data/local-fixture.token --rapid-url http://localhost:4766 --variant original --split development --report /home/oshki/Projects/fittune/data/rapid-development.json
+python3 tests/label-ocr/benchmark.py --fixtures /home/oshki/Projects/fittune/data/fittune-label-fixtures --observations /home/oshki/Projects/fittune/data/crops-original --prepare-only --variant original --split development
 ```
 
 From the frontend checkout:
 
 ```sh
-bun scripts/benchmark-ocr.mjs /path/to/fittune-api/tests/label-ocr/manifest.json /tmp/crops-original /tmp/tesseract-original 11 development
+bun scripts/benchmark-ocr.mjs /path/to/fittune-api/tests/label-ocr/manifest.json /home/oshki/Projects/fittune/data/crops-original /home/oshki/Projects/fittune/data/tesseract-original 11 development
 ```
 
 Replay those normalized Tesseract observations through `benchmark.py` without `--rapid-url`.
@@ -83,16 +83,37 @@ Original crops remain the default rather than selecting a transform based only o
 The final one-CPU, 512 MiB sidecar completed 180 fixture requests without worker failures or OOMs, with a measured cgroup peak of 370491392 bytes (353.3 MiB).
 These timings and memory figures come from a Ryzen 7 3700X desktop with container CPU limits, not the production VPS or a phone.
 
+## Soft-scored rerun
+
+`soft-scored-rerun.json` records a fresh 60-photo run using upward rounding to one decimal and the inclusive 0.6 absolute tolerance.
+Full images, crops, observations, reports and logs are kept under `/home/oshki/Projects/fittune/data`, with the new run in `data/label-ocr-rerun`.
+The previous observations were also rescored with that rule to separate scoring changes from extraction changes.
+
+| Engine | Correct / printed | Incorrect suggestions | Correct / populated suggestions |
+| --- | --- | --- | --- |
+| RapidOCR | 188 / 420 | 31 | 85.8 percent |
+| Tesseract | 35 / 420 | 32 | 52.2 percent |
+
+These scores match the previous output under the same soft rule; the increase over the archived strict baseline comes from scoring tolerance.
+The initial macro heuristic introduced one incorrect proposal when `14g` was recognized as `149`; requiring a recognized mass unit prevents that case.
+No corrections were applied to this corpus after the guard, so the heuristic has not demonstrated a real-fixture accuracy improvement.
+For example, the Tesseract `2,5g` to `25g` error cannot be corrected reliably when protein is missing and kcal are marked uncertain.
+Both engines completed all 60 images without service failures; the sidecar's existing cgroup peak remained 353.3 MiB with no OOMs.
+The full Rust suite passed 190 tests and the frontend suite passed 198 tests, followed by eight focused OCR unit tests and five OCR API tests after the guard change.
+The Python scoring and watchdog checks, Clippy, frontend lint, typecheck and build also passed.
+These results continue to block production release on accuracy.
+
 ## Macro consistency correction
 
 The shared Rust parser can propose a lost-decimal correction when detected kcal and all three macros are present and the calorie reading has no uncertainty or conflict warning.
 It compares 4 kcal per gram of protein/carbohydrate and 9 kcal per gram of fat, using the existing consistency tolerance of 15 percent of detected kcal or 10 kcal, whichever is greater.
+The corrected field must also contain an explicitly recognized mass unit, so a lost `g` read as `9` cannot be treated as a missing decimal.
 It tries dividing one macro by 10 or 100 and accepts only one unique candidate that also passes supported ranges, total mass and parent-nutrient checks.
 The original OCR evidence is preserved, the adjustment is annotated, and the UI warns the user to confirm the printed label.
 When detected kcal exceed the original macro estimate by more than that tolerance, correction is skipped and a warning is shown.
 This is a proposal for OCR output, not a general way to infer missing nutrients, and AI extraction is not automatically rewritten.
 The energy equation is underdetermined and fibre, polyols and other energy contributors can affect the estimate.
-This heuristic needs a new fixture comparison before release; the existing baseline predates it.
+The soft-scored rerun above evaluates this heuristic, while the archived strict baseline predates it.
 
 Run the lightweight scoring check independently when testing resumes:
 

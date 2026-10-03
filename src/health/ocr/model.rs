@@ -153,6 +153,27 @@ impl Extraction {
         // A calorie equation cannot identify three unknowns, so require one unique decimal-shift candidate
         let mut candidates = Vec::new();
         for (index, value) in macros.iter().enumerate() {
+            let has_mass_unit = self.evidence.get(fields[index]).is_some_and(|text| {
+                text.split_whitespace().any(|word| {
+                    let word = word
+                        .trim_matches(|c: char| !c.is_alphanumeric())
+                        .to_lowercase();
+                    word == "g"
+                        || word == "mg"
+                        || word
+                            .strip_suffix("mg")
+                            .or_else(|| word.strip_suffix('g'))
+                            .is_some_and(|number| {
+                                number.chars().any(|c| c.is_ascii_digit())
+                                    && number
+                                        .chars()
+                                        .all(|c| c.is_ascii_digit() || matches!(c, '.' | ','))
+                            })
+                })
+            });
+            if !has_mass_unit {
+                continue;
+            }
             for divisor in [10.0, 100.0] {
                 let mut candidate = macros;
                 candidate[index] = value / divisor;
@@ -237,6 +258,8 @@ mod tests {
             ("carbs_g", carbs),
         ] {
             out.values.insert(field.into(), Some(value));
+            out.evidence
+                .insert(field.into(), format!("{field} {value}g"));
         }
         out
     }
@@ -250,8 +273,13 @@ mod tests {
             (107.0, 19.0, 250.0, 2.2, "fat_g", 2.5),
         ] {
             let mut out = reading(kcal, protein, fat, carbs);
-            out.evidence
-                .insert(field.into(), "Original OCR text".into());
+            out.evidence.insert(
+                field.into(),
+                format!(
+                    "Original OCR text {}g",
+                    out.values[field].expect("observed macro")
+                ),
+            );
             out.check();
             assert_eq!(out.values[field], Some(expected));
             assert!(
@@ -259,7 +287,10 @@ mod tests {
                     .iter()
                     .any(|warning| warning.contains("Possible lost decimal point"))
             );
-            assert!(out.evidence[field].starts_with("Original OCR text ["));
+            assert!(
+                out.evidence[field].starts_with("Original OCR text ")
+                    && out.evidence[field].contains(" -> ")
+            );
         }
         let mut high_energy = reading(500.0, 19.0, 2.5, 2.2);
         high_energy.check();
@@ -275,7 +306,14 @@ mod tests {
         assert_eq!(ambiguous.values["protein_g"], Some(10.0));
         assert_eq!(ambiguous.values["carbs_g"], Some(10.0));
 
-        for scenario in ["missing", "uncertain", "parent", "ai", "invalid_energy"] {
+        for scenario in [
+            "missing",
+            "uncertain",
+            "parent",
+            "ai",
+            "invalid_energy",
+            "unit",
+        ] {
             let mut out = reading(107.0, 19.0, 25.0, 2.2);
             match scenario {
                 "missing" => {
@@ -286,6 +324,9 @@ mod tests {
                     out.values.insert("saturated_fat_g".into(), Some(3.0));
                 }
                 "ai" => out.source = "ai".into(),
+                "unit" => {
+                    out.evidence.insert("fat_g".into(), "Fat 25kg".into());
+                }
                 _ => {
                     out.values.insert("energy_kcal".into(), Some(1070.0));
                 }
@@ -293,5 +334,17 @@ mod tests {
             out.check();
             assert_eq!(out.values["fat_g"], Some(25.0), "{scenario}");
         }
+
+        let mut missing_unit = reading(160.0 / 0.28, 7.0 / 0.28, 149.0 / 0.28, 4.0 / 0.28);
+        missing_unit
+            .evidence
+            .insert("fat_g".into(), "Total Fat 149 18% THE IR".into());
+        missing_unit.check();
+        assert_eq!(missing_unit.values["fat_g"], None);
+        assert!(
+            !missing_unit.warnings["fat_g"]
+                .iter()
+                .any(|warning| warning.contains("Possible lost decimal point"))
+        );
     }
 }
