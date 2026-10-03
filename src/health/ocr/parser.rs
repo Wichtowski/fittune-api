@@ -102,7 +102,14 @@ fn split_observations(input: &[Observation]) -> Vec<Observation> {
                 .filter(|part| !part.is_empty())
                 .collect();
             if parts.len() < 2 {
-                return vec![item.clone()];
+                let mut observation = item.clone();
+                if let Some(part) = parts.first().filter(|part| {
+                    item.text.trim_start().starts_with('/')
+                        && number(part).is_some_and(|(amount, _)| amount == 100.0)
+                }) {
+                    observation.text = (*part).into();
+                }
+                return vec![observation];
             }
             let width = (item.bbox[2] - item.bbox[0]) / item.text.chars().count().max(1) as f64;
             let mut x = item.bbox[0];
@@ -123,21 +130,75 @@ fn split_observations(input: &[Observation]) -> Vec<Observation> {
         .collect()
 }
 
-fn rows(observations: &[Observation]) -> Vec<Vec<&Observation>> {
+fn text_slope(observations: &[Observation]) -> f64 {
+    // Estimate text tilt from neighbouring words, without changing the captured image
+    let mut slopes = Vec::new();
+    for a in observations {
+        let height = a.bbox[3] - a.bbox[1];
+        for b in observations {
+            let dx = (b.bbox[0] + b.bbox[2] - a.bbox[0] - a.bbox[2]) / 2.0;
+            let dy = (b.bbox[1] + b.bbox[3] - a.bbox[1] - a.bbox[3]) / 2.0;
+            let ratio = (b.bbox[3] - b.bbox[1]) / height;
+            if b.bbox[0] >= a.bbox[2]
+                && b.bbox[0] - a.bbox[2] < height * 2.0
+                && dx > height * 1.5
+                && (0.7..=1.4).contains(&ratio)
+                && (dy / dx).abs() <= 0.15
+            {
+                slopes.push(dy / dx);
+            }
+        }
+    }
+    slopes.sort_by(f64::total_cmp);
+    let slope = slopes.get(slopes.len() / 2).copied().unwrap_or(0.0);
+    let mut deviations: Vec<_> = slopes.iter().map(|value| (value - slope).abs()).collect();
+    deviations.sort_by(f64::total_cmp);
+    let deviation = deviations.get(deviations.len() / 2).copied().unwrap_or(0.0);
+    if slope.abs() > deviation * 2.0 {
+        slope
+    } else {
+        0.0
+    }
+}
+
+fn rows(observations: &[Observation], slope: f64) -> Vec<Vec<&Observation>> {
+    let center = |o: &Observation| (o.bbox[1] + o.bbox[3] - slope * (o.bbox[0] + o.bbox[2])) / 2.0;
     let mut sorted: Vec<_> = observations.iter().collect();
-    sorted.sort_by(|a, b| a.bbox[1].total_cmp(&b.bbox[1]));
+    // Establish label anchors before assigning values that can overlap adjacent text rows
+    let priority = |o: &Observation| {
+        if label(&o.text).is_some() {
+            0
+        } else if number(&o.text).is_some() {
+            2
+        } else {
+            1
+        }
+    };
+    sorted.sort_by(|a, b| {
+        priority(a)
+            .cmp(&priority(b))
+            .then_with(|| center(a).total_cmp(&center(b)))
+    });
     let mut rows: Vec<Vec<&Observation>> = Vec::new();
     for item in sorted {
-        if let Some(row) = rows.iter_mut().find(|r| {
-            let other = r[0];
-            ((item.bbox[1] + item.bbox[3] - other.bbox[1] - other.bbox[3]) / 2.0).abs()
-                < 0.35 * (item.bbox[3] - item.bbox[1]).min(other.bbox[3] - other.bbox[1])
-        }) {
+        if let Some(row) = rows
+            .iter_mut()
+            .filter(|r| {
+                (center(item) - center(r[0])).abs()
+                    < 0.25 * (item.bbox[3] - item.bbox[1] + r[0].bbox[3] - r[0].bbox[1])
+            })
+            .min_by(|a, b| {
+                (center(item) - center(a[0]))
+                    .abs()
+                    .total_cmp(&(center(item) - center(b[0])).abs())
+            })
+        {
             row.push(item);
         } else {
             rows.push(vec![item]);
         }
     }
+    rows.sort_by(|a, b| center(a[0]).total_cmp(&center(b[0])));
     for row in &mut rows {
         row.sort_by(|a, b| a.bbox[0].total_cmp(&b.bbox[0]));
     }
@@ -146,7 +207,7 @@ fn rows(observations: &[Observation]) -> Vec<Vec<&Observation>> {
 
 pub fn parse(input: &ParseRequest) -> Extraction {
     let observations = split_observations(&input.observations);
-    let rows = rows(&observations);
+    let rows = rows(&observations, text_slope(&input.observations));
     let mut out = Extraction::blank("ocr");
     // Header detection is independent of row grouping because slanted tables overlap rows
     let first_nutrient = observations
@@ -159,7 +220,9 @@ pub fn parse(input: &ParseRequest) -> Extraction {
         if item.bbox[1] >= first_nutrient {
             continue;
         }
-        let Some((amount, _)) = number(&item.text) else {
+        let header_text = normalized(&item.text);
+        let Some((amount, _)) = number(header_text.strip_prefix("per").unwrap_or(&item.text))
+        else {
             continue;
         };
         if item.text.contains('%') || amount <= 0.0 || amount > 2000.0 {
@@ -190,9 +253,18 @@ pub fn parse(input: &ParseRequest) -> Extraction {
         let next = observations
             .iter()
             .filter(|o| {
-                o.bbox[0] >= item.bbox[2] - height * 0.4
-                    && o.bbox[0] - item.bbox[2] < height
-                    && (o.bbox[1] - item.bbox[1]).abs() < height * 0.6
+                o.bbox[1] < first_nutrient
+                    && matches!(
+                        normalized(&o.text).trim_matches(|c: char| !c.is_alphanumeric()),
+                        "g" | "ml"
+                    )
+                    && ((o.bbox[0] >= item.bbox[2] - height * 0.4
+                        && o.bbox[0] - item.bbox[2] < height
+                        && (o.bbox[1] - item.bbox[1]).abs() < height * 0.6)
+                        || (o.bbox[0] < item.bbox[2]
+                            && o.bbox[2] > item.bbox[0]
+                            && o.bbox[1] >= item.bbox[3]
+                            && o.bbox[1] - item.bbox[3] < height * 0.6))
             })
             .min_by(|a, b| a.bbox[0].total_cmp(&b.bbox[0]));
         let next = next
@@ -347,12 +419,23 @@ pub fn parse(input: &ParseRequest) -> Extraction {
         let Some(field) = field else {
             continue;
         };
+        let calorie_words = normalized(&previous_label);
+        let calories_label = calorie_words
+            .split(|c: char| !c.is_alphabetic())
+            .any(|word| distance(word, "calories") <= 1);
         let belongs = |o: &Observation| {
             let center = (o.bbox[0] + o.bbox[2]) / 2.0;
-            !out.columns
-                .iter()
-                .enumerate()
-                .any(|(i, c)| i != selected && (center - c.x).abs() < (center - x).abs())
+            let after_label = own_label.is_none()
+                || row
+                    .iter()
+                    .filter(|label_word| label(&label_word.text) == Some(field))
+                    .all(|label_word| o.bbox[0] >= label_word.bbox[2] - height * 0.4);
+            after_label
+                && !out
+                    .columns
+                    .iter()
+                    .enumerate()
+                    .any(|(i, c)| i != selected && (center - c.x).abs() < (center - x).abs())
         };
         let energy_unit = |o: &Observation| {
             let words = normalized(
@@ -383,12 +466,11 @@ pub fn parse(input: &ParseRequest) -> Extraction {
         let item = numerics
             .iter()
             .filter(|o| belongs(o))
-            .max_by_key(|o| {
-                if field == "energy_kcal" {
-                    energy_unit(o)
-                } else {
-                    0
-                }
+            .max_by(|a, b| {
+                energy_unit(a).cmp(&energy_unit(b)).then_with(|| {
+                    let center = |o: &Observation| (o.bbox[0] + o.bbox[2]) / 2.0;
+                    (center(b) - x).abs().total_cmp(&(center(a) - x).abs())
+                })
             })
             .filter(|o| field == "energy_kcal" && energy_unit(o) > 0)
             .or_else(|| {
@@ -400,6 +482,10 @@ pub fn parse(input: &ParseRequest) -> Extraction {
         let Some(item) = item else {
             continue;
         };
+        // Consume a numeric continuation once; energy can continue for its kcal reading
+        if own_label.is_none() && field != "energy_kcal" {
+            previous_label.clear();
+        }
         let center = (item.bbox[0] + item.bbox[2]) / 2.0;
         if out
             .columns
@@ -434,10 +520,7 @@ pub fn parse(input: &ParseRequest) -> Extraction {
             .collect::<Vec<_>>()
             .join(" ");
         let units = normalized(&format!("{} {units}", item.text));
-        if field == "energy_kcal"
-            && !units.contains("kcal")
-            && !normalized(&out.evidence[field]).contains("calories")
-        {
+        if field == "energy_kcal" && !units.contains("kcal") && !calories_label {
             if units.contains("kj") {
                 value /= 4.184;
                 out.warn(field, "Converted from kJ; check the label");
@@ -451,8 +534,7 @@ pub fn parse(input: &ParseRequest) -> Extraction {
         } else if field != "energy_kcal" && units.contains("mg") {
             value /= 1000.0;
         }
-        let kcal = field == "energy_kcal"
-            && (units.contains("kcal") || normalized(&out.evidence[field]).contains("calories"));
+        let kcal = field == "energy_kcal" && (units.contains("kcal") || calories_label);
         if field == "energy_kcal" && energy_is_kcal && !kcal {
             continue;
         }
@@ -477,7 +559,13 @@ pub fn parse(input: &ParseRequest) -> Extraction {
             }
             energy_is_kcal = true;
         }
-        if corrected || item.confidence < 0.8 {
+        if corrected
+            || item.confidence < 0.8
+            || (calories_label
+                && !calorie_words
+                    .split(|c: char| !c.is_alphabetic())
+                    .any(|word| word == "calories"))
+        {
             out.warn(field, "Uncertain OCR reading; check the label");
         }
         if factor != 1.0 {
@@ -500,6 +588,138 @@ mod tests {
             confidence: 0.95,
             bbox: [x, y, x + 60.0, y + 20.0],
         }
+    }
+    #[test]
+    fn recognizes_slash_attached_and_wrapped_basis_headers() {
+        for header in [
+            vec![obs("/100", 400.0, 0.0), obs("g", 465.0, 0.0)],
+            vec![obs("100g", 400.0, 0.0)],
+            vec![obs("per100", 400.0, 0.0), obs("g", 465.0, 0.0)],
+            vec![obs("100", 400.0, 0.0), obs("ml", 400.0, 22.0)],
+        ] {
+            let mut observations = header;
+            observations.extend([obs("Protein", 0.0, 80.0), obs("8g", 400.0, 80.0)]);
+            let result = parse(&ParseRequest {
+                width: 600,
+                height: 200,
+                column: None,
+                observations,
+            });
+            assert_eq!(result.values["protein_g"], Some(8.0));
+        }
+    }
+
+    #[test]
+    fn energy_uses_nearest_basis_when_portion_header_is_unreadable() {
+        let result = parse(&ParseRequest {
+            width: 800,
+            height: 200,
+            column: None,
+            observations: vec![
+                obs("100g", 400.0, 0.0),
+                obs("Energy", 0.0, 60.0),
+                obs("463kcal", 400.0, 60.0),
+                obs("93kcal", 600.0, 60.0),
+            ],
+        });
+        assert_eq!(result.values["energy_kcal"], Some(463.0));
+    }
+
+    #[test]
+    fn unlabelled_later_numeric_rows_do_not_inherit_protein() {
+        let result = parse(&ParseRequest {
+            width: 600,
+            height: 200,
+            column: None,
+            observations: vec![
+                obs("100g", 400.0, 0.0),
+                obs("Protein", 0.0, 60.0),
+                obs("1g", 400.0, 80.0),
+                obs("0.02g", 400.0, 105.0),
+            ],
+        });
+        assert_eq!(result.values["protein_g"], Some(1.0));
+    }
+
+    #[test]
+    fn aligns_slanted_rows_without_crossing_nutrients_or_portion_columns() {
+        let result = parse(&ParseRequest {
+            width: 800,
+            height: 300,
+            column: None,
+            observations: vec![
+                obs("100g", 400.0, 0.0),
+                obs("Total", 0.0, 60.0),
+                obs("Carbohydrate", 80.0, 64.0),
+                obs("47g", 400.0, 80.0),
+                obs("23g", 600.0, 90.0),
+                obs("Total", 0.0, 90.0),
+                obs("Sugars", 80.0, 94.0),
+                obs("4.2g", 400.0, 110.0),
+                obs("2.1g", 600.0, 120.0),
+            ],
+        });
+        assert_eq!(result.values["carbs_g"], Some(47.0));
+        assert_eq!(result.values["sugars_g"], Some(4.2));
+    }
+
+    #[test]
+    fn serving_fraction_is_not_a_wrapped_mass_header() {
+        let result = parse(&ParseRequest {
+            width: 800,
+            height: 300,
+            column: None,
+            observations: vec![
+                obs("Serving size", 0.0, 0.0),
+                obs("1/4", 400.0, 0.0),
+                obs("(28g)", 400.0, 22.0),
+                obs("Protein", 0.0, 80.0),
+                obs("7g", 400.0, 80.0),
+            ],
+        });
+        assert_eq!(result.columns.len(), 1);
+        assert_eq!(result.values["protein_g"], Some(25.0));
+    }
+
+    #[test]
+    fn fuzzy_calories_label_supplies_kcal_but_warns_and_energy_requires_a_unit() {
+        for (text, expected) in [("Galories", Some(300.0)), ("Energy", None)] {
+            let result = parse(&ParseRequest {
+                width: 600,
+                height: 200,
+                column: None,
+                observations: vec![
+                    obs("100g", 400.0, 0.0),
+                    obs(text, 0.0, 60.0),
+                    obs("300", 400.0, 80.0),
+                ],
+            });
+            assert_eq!(result.values["energy_kcal"], expected);
+            assert!(result.warnings.contains_key("energy_kcal"));
+        }
+    }
+
+    #[test]
+    fn recovers_slash_header_and_overlapping_rows_from_real_polish_observations() {
+        let input: ParseRequest = serde_json::from_str(include_str!(
+            "../../../tests/label-ocr/observations/pl-01.json"
+        ))
+        .expect("valid fixture observations");
+        input.validate().expect("bounded fixture observations");
+        let result = parse(&input);
+        for (field, value) in [
+            ("energy_kcal", 232.0),
+            ("fat_g", 19.2),
+            ("sugars_g", 1.2),
+            ("fiber_g", 4.0),
+            ("protein_g", 3.8),
+            ("salt_g", 1.5),
+        ] {
+            assert_eq!(result.values[field], Some(value), "{field}");
+        }
+        // These values were not recognized, so neighbouring readings must not fill them
+        assert_eq!(result.values["carbs_g"], None);
+        assert_eq!(result.values["saturated_fat_g"], None);
     }
     #[test]
     fn selects_header_not_first_numeric_column_and_preserves_bounds() {

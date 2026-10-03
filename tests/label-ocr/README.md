@@ -64,7 +64,7 @@ These desktop measurements do not establish mobile-device performance or actual 
 `results/` records every original-crop development and held-out result, including missing and incorrect values.
 The archived baseline and results below used the earlier strict tolerance of 1 kcal and the greater of 0.01 g or 2 percent for nutrients, before decimal correction.
 They are not directly comparable with future soft-scored runs.
-The two normalized public observations in `observations/` are real Polish/English parser regression inputs and inherit the manifest attribution and license.
+The normalized public observations in `observations/` are real Polish/English parser regression inputs and inherit the manifest attribution and license.
 Held-out labels were evaluated after development tuning; the later kJ/kcal warning does not change extracted values.
 
 | Engine / split | PL correct / printed | EN correct / printed | Incorrect suggestions | PL / EN p95 |
@@ -102,6 +102,32 @@ Both engines completed all 60 images without service failures; the sidecar's exi
 The full Rust suite passed 190 tests and the frontend suite passed 198 tests, followed by eight focused OCR unit tests and five OCR API tests after the guard change.
 The Python scoring and watchdog checks, Clippy, frontend lint, typecheck and build also passed.
 These results continue to block production release on accuracy.
+
+## Shared-parser replay
+
+`parser-replay.json` compares the frozen parser improvements against the soft-scored rerun using exactly the same saved observations, annotations and scoring rule.
+Header recognition accepts `/100 g`, attached `100g`/`per100` and wrapped g/ml units, while serving fractions do not create mass headers.
+Rows anchor on nutrient labels, compensate only for consistent text tilt and match nearby values without taking values before the nutrient label.
+Energy ties choose the value nearest the selected basis, numeric continuation is consumed once and fuzzy Calories labels retain an uncertainty warning.
+These changes affect the shared Rust parser for both engines and add no OCR or image-processing dependency.
+
+| Engine | Correct / printed before -> after | Incorrect suggestions before -> after | Correct / populated after |
+| --- | --- | --- | --- |
+| RapidOCR | 188 -> 228 / 420 | 31 -> 18 | 92.7 percent |
+| Tesseract | 35 -> 45 / 420 | 32 -> 29 | 60.8 percent |
+
+On the 40 development photos, RapidOCR improves from 129 to 162 correct values with incorrect suggestions falling from 18 to 6.
+Tesseract improves from 33 to 42 correct values with incorrect suggestions falling from 25 to 20.
+The frozen held-out replay improves RapidOCR from 59 to 66 correct values with incorrect suggestions falling from 13 to 12.
+Tesseract's held-out result improves from 2 to 3 correct values but adds two incorrect suggestions overall, from 7 to 9.
+Its Polish held-out errors increase from 6 to 9 while the English error falls from 1 to 0, so Tesseract fails the held-out safety gate.
+Both engines improve over all 60 photos, but this does not establish reliable local OCR or remove the accuracy release blocker.
+No macro decimal correction was applied to these observations.
+The held-out results were evaluated once after development tuning; their failures were not used to tune the parser further.
+All 60 original image digests were verified, and the comparison records the manifest and saved-observation digests.
+Full reports and logs are under `/home/oshki/Projects/fittune/data/label-ocr-parser-fixes`.
+The full Rust suite passes 197 tests, including 15 focused OCR unit tests, and Clippy and the Python soft-scoring check pass.
+This replay does not rerun OCR inference or establish new recognition timings, mobile memory or production-VPS performance.
 
 ## Macro consistency correction
 
