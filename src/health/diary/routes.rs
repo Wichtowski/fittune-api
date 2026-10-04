@@ -87,7 +87,7 @@ async fn day(
             entries.into_iter().partition(|e| e.meal_id == meal.id);
         entries = rest;
         let meal_totals = mine.iter().fold(Totals::default(), |sum, e| {
-            sum + Totals::of(&e.per_100g, e.grams)
+            sum + Totals::of(&e.per_100g, e.amount)
         });
         totals = totals + meal_totals;
         day_meals.push(DayMeal {

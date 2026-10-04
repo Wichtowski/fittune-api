@@ -6,7 +6,7 @@ use crate::{
     error::{ApiResult, FieldErrors},
     health::{
         exercise::Exercise,
-        nutrients::{Nutrients, Totals},
+        nutrients::{Nutrients, Totals, Unit},
         targets::Targets,
     },
     validate,
@@ -19,7 +19,9 @@ pub struct Entry {
     pub date: NaiveDate,
     pub meal_id: Uuid,
     pub product_id: Option<Uuid>,
-    pub grams: f64,
+    pub amount: f64,
+    /// Grams or millilitres, as the product was measured when logged
+    pub unit: Unit,
     pub product_name: String,
     pub product_brand: Option<String>,
     #[sqlx(flatten)]
@@ -32,13 +34,13 @@ pub struct EntryRequest {
     pub date: NaiveDate,
     pub meal_id: Uuid,
     pub product_id: Uuid,
-    pub grams: f64,
+    pub amount: f64,
 }
 
 impl EntryRequest {
     pub fn validate(self) -> ApiResult<Self> {
         let mut errors = FieldErrors::default();
-        validate::finite_in_range(&mut errors, "grams", Some(self.grams), 0.1, 5000.0);
+        validate::finite_in_range(&mut errors, "amount", Some(self.amount), 0.1, 5000.0);
         errors.into_result()?;
         Ok(self)
     }

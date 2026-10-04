@@ -4,7 +4,7 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 
-use crate::health::barcode;
+use crate::health::{barcode, nutrients::Unit};
 
 /// Positions of the columns FitHealth reads, found by name so OFF may add or reorder columns
 #[derive(Debug, Clone)]
@@ -13,6 +13,7 @@ pub struct Columns {
     product_name: usize,
     brands: usize,
     main_category: usize,
+    quantity: usize,
     energy_kcal: usize,
     energy_kj: usize,
     protein: usize,
@@ -42,6 +43,7 @@ impl Columns {
             product_name: find("product_name")?,
             brands: find("brands")?,
             main_category: find("main_category")?,
+            quantity: find("quantity")?,
             energy_kcal: find("energy-kcal_100g")?,
             energy_kj: find("energy_100g")?,
             protein: find("proteins_100g")?,
@@ -79,8 +81,9 @@ pub struct OffRow {
     pub brand: Option<String>,
     pub main_category: Option<String>,
     pub nutrients: Option<OffNutrients>,
-    pub serving_g: Option<f64>,
+    pub serving_amount: Option<f64>,
     pub serving_name: Option<String>,
+    pub unit: Unit,
     pub modified_at: Option<DateTime<Utc>>,
 }
 
@@ -147,8 +150,8 @@ pub fn parse(columns: &Columns, line: &str) -> Result<OffRow, Skip> {
         _ => None,
     };
 
-    let serving_g = number(columns.serving_quantity).filter(|g| *g > 0.0 && *g <= 2000.0);
-    let serving_name = serving_g
+    let serving_amount = number(columns.serving_quantity).filter(|g| *g > 0.0 && *g <= 2000.0);
+    let serving_name = serving_amount
         .and(text(columns.serving_size))
         .map(|s| capped(s, 40));
     let modified_at = text(columns.last_modified)
@@ -156,15 +159,30 @@ pub fn parse(columns: &Columns, line: &str) -> Result<OffRow, Skip> {
         .and_then(|t| DateTime::from_timestamp(t, 0));
 
     Ok(OffRow {
+        unit: text(columns.quantity).map_or(Unit::G, unit_of_pack),
         barcode,
         name,
         brand,
         main_category,
         nutrients,
-        serving_g,
+        serving_amount,
         serving_name,
         modified_at,
     })
+}
+
+/// EU labels give products sold by volume per 100 ml, so a pack size in ml, cl or litres means a
+/// drink. OFF's category is no help here: it files dry tea and drink powders under beverages
+fn unit_of_pack(quantity: &str) -> Unit {
+    let quantity = quantity.to_lowercase();
+    let volume = quantity.split(|c: char| !c.is_alphanumeric()).any(|word| {
+        let unit = word.trim_start_matches(|c: char| c.is_ascii_digit());
+        matches!(
+            unit,
+            "ml" | "cl" | "l" | "litre" | "litres" | "liter" | "liters"
+        )
+    });
+    if volume { Unit::Ml } else { Unit::G }
 }
 
 fn capped(value: &str, max_chars: usize) -> String {
@@ -180,7 +198,7 @@ fn capped(value: &str, max_chars: usize) -> String {
 mod tests {
     use super::*;
 
-    const HEADER: &str = "code\turl\tlast_modified_t\tproduct_name\tbrands\tmain_category\tserving_size\tserving_quantity\tenergy_100g\tenergy-kcal_100g\tfat_100g\tsaturated-fat_100g\tcarbohydrates_100g\tsugars_100g\tfiber_100g\tproteins_100g\tsalt_100g";
+    const HEADER: &str = "code\turl\tlast_modified_t\tproduct_name\tbrands\tquantity\tmain_category\tserving_size\tserving_quantity\tenergy_100g\tenergy-kcal_100g\tfat_100g\tsaturated-fat_100g\tcarbohydrates_100g\tsugars_100g\tfiber_100g\tproteins_100g\tsalt_100g";
 
     fn line(fields: &[(&str, &str)]) -> String {
         let names: Vec<&str> = HEADER.split('\t').collect();
@@ -238,7 +256,7 @@ mod tests {
         assert_eq!(row.name, "Płatki owsiane");
         assert_eq!(row.brand.as_deref(), Some("Melvit"));
         assert_eq!(row.main_category.as_deref(), Some("en:oat-flakes"));
-        assert_eq!(row.serving_g, Some(40.0));
+        assert_eq!(row.serving_amount, Some(40.0));
         assert_eq!(row.serving_name.as_deref(), Some("40 g"));
         assert_eq!(row.modified_at.map(|t| t.timestamp()), Some(1_700_000_000));
         let n = row.nutrients.expect("nutrients");
@@ -333,7 +351,27 @@ mod tests {
         )
         .expect("row");
         assert_eq!(row.name.chars().count(), 120);
-        assert_eq!((row.serving_g, row.serving_name), (None, None));
+        assert_eq!((row.serving_amount, row.serving_name), (None, None));
+    }
+
+    #[test]
+    fn products_sold_by_volume_are_measured_in_millilitres() {
+        for quantity in [
+            "500 ml",
+            "1,5 L",
+            "0.33l",
+            "33 cl",
+            "10 x 50 ml",
+            "2 Liter",
+            "1 litre",
+        ] {
+            let row = parse(&columns(), &with(&[("quantity", quantity)])).expect("row");
+            assert_eq!(row.unit, Unit::Ml, "{quantity}");
+        }
+        for quantity in ["500 g", "1 kg", "", "12 pieces", "1 lb"] {
+            let row = parse(&columns(), &with(&[("quantity", quantity)])).expect("row");
+            assert_eq!(row.unit, Unit::G, "{quantity}");
+        }
     }
 
     #[test]

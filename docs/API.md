@@ -411,7 +411,7 @@ FeedEntry { "user": PublicUser, "type": "activity", "id": "uuid", "kind": "run",
 
 ## FitHealth (`/api/v1/health`)
 
-Nutrition values are per 100 g. Diary days are the user's local date; pass `tz` (IANA name) like the stats endpoints.
+Nutrition values are per 100 of the product's `unit`: `g`, or `ml` for drinks (EU labels give drinks per 100 ml). Entry `amount` and `serving_amount` are in that unit. Diary days are the user's local date; pass `tz` (IANA name) like the stats endpoints.
 
 | Method | Path | Result |
 | --- | --- | --- |
@@ -425,7 +425,7 @@ Nutrition values are per 100 g. Diary days are the user's local date; pass `tz` 
 | PUT | `/api/v1/health/meals/order` | `Meal[]`, `{ ids }` listing every active meal once |
 | DELETE | `/api/v1/health/meals/{id}` | `204`; archives, past entries keep it; `409` for the last meal |
 | GET | `/api/v1/health/days/{date}?tz=` | `Day`: meals with entries and totals, day totals, targets, training, weight, `missing` |
-| PUT | `/api/v1/health/entries/{id}` | `201` or `200 Entry`, `{ date, meal_id, product_id, grams }` |
+| PUT | `/api/v1/health/entries/{id}` | `201` or `200 Entry`, `{ date, meal_id, product_id, amount }`, the amount in the product's unit |
 | DELETE | `/api/v1/health/entries/{id}` | `204` |
 | GET | `/api/v1/health/profile` | `Profile`, all fields `null` before setup |
 | PUT | `/api/v1/health/profile` | `Profile`: `sex`, `height_cm`, `activity`, `goal`, `pace_kg_per_week`, optional overrides `energy_kcal`, `protein_g`, `fat_g`, `carbs_g` |
