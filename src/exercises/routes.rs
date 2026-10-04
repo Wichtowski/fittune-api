@@ -42,7 +42,7 @@ async fn list(
         equipment: query.equipment,
     };
     Ok(axum::Json(
-        repo::list(&state.db, auth.user_id(), &filter).await?,
+        repo::list(&state.db, auth.viewer(), &filter).await?,
     ))
 }
 
@@ -71,7 +71,7 @@ async fn create(
         .await
         .map_err(duplicate_name)?;
     tx.commit().await?;
-    Ok((StatusCode::CREATED, axum::Json(exercise)))
+    Ok((StatusCode::CREATED, axum::Json(for_viewer(exercise, &auth))))
 }
 
 async fn update(
@@ -87,7 +87,7 @@ async fn update(
         .await
         .map_err(duplicate_name)?;
     tx.commit().await?;
-    Ok(axum::Json(exercise))
+    Ok(axum::Json(for_viewer(exercise, &auth)))
 }
 
 /// Archives rather than deletes, so past workouts keep their exercise.
@@ -130,18 +130,25 @@ async fn show_history(
 }
 
 async fn visible(state: &AppState, auth: &Auth, id: Uuid) -> ApiResult<Exercise> {
-    repo::find_visible(&state.db, auth.user_id(), id)
+    repo::find_visible(&state.db, auth.viewer(), id)
         .await?
         .ok_or(ApiError::NotFound("exercise"))
 }
 
-/// Custom exercises can be edited by their owner, catalog exercises only by admins.
+/// Seeing a shared exercise does not allow changing it: only its owner does that. Admins change
+/// the catalog and moderate what users created.
 async fn editable(state: &AppState, auth: &Auth, id: Uuid) -> ApiResult<Exercise> {
     let exercise = visible(state, auth, id).await?;
-    if exercise.owner_id.is_none() {
+    if !exercise.is_own {
         auth.require_admin()?;
     }
     Ok(exercise)
+}
+
+/// Marks an exercise that was just written as the caller's own or not
+fn for_viewer(mut exercise: Exercise, auth: &Auth) -> Exercise {
+    exercise.is_own = exercise.owner_id == Some(auth.user_id());
+    exercise
 }
 
 fn duplicate_name(err: sqlx::Error) -> ApiError {

@@ -89,7 +89,7 @@ async fn ensure_exercises_visible(
     draft: &RoutineDraft,
 ) -> ApiResult<()> {
     let ids = draft.exercises.iter().map(|e| e.exercise_id);
-    if exercises::repo::all_visible(&state.db, auth.user_id(), ids).await? {
+    if exercises::repo::all_visible(&state.db, auth.viewer(), ids).await? {
         Ok(())
     } else {
         Err(ApiError::validation(
