@@ -143,8 +143,8 @@ async fn delete_me(
         "Password is incorrect",
     )
     .await?;
-    crate::photos::delete_all_for_user(&state, auth.user_id()).await?;
     repo::delete(&state.db, auth.user_id()).await?;
+    crate::photos::cleanup::after_delete(&state).await;
     tracing::info!(user_id = %auth.user_id(), "account deleted");
     Ok(StatusCode::NO_CONTENT)
 }
@@ -160,13 +160,14 @@ async fn confirm_password(
     message: &'static str,
 ) -> ApiResult<()> {
     let key = format!("password-user:{user_id}");
-    if !state.login_attempts.allows(&key) {
-        return Err(ApiError::RateLimited);
-    }
+    let window = state
+        .login_attempts
+        .reserve(&key)
+        .ok_or(ApiError::RateLimited)?;
     if !password::verify(candidate, hash).await? {
-        state.login_attempts.record(&key);
         return Err(ApiError::validation(field, message));
     }
+    state.login_attempts.refund(&key, window);
     Ok(())
 }
 

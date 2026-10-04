@@ -29,6 +29,7 @@ pub struct Principal {
     pub session_id: Uuid,
 }
 
+/// Issues a random bearer token and stores only its digest
 pub async fn create(
     db: impl PgExecutor<'_>,
     user_id: Uuid,
@@ -87,6 +88,7 @@ pub async fn authenticate(
     }))
 }
 
+/// Deletes one session, immediately invalidating its token
 pub async fn revoke(db: impl PgExecutor<'_>, session_id: Uuid) -> sqlx::Result<()> {
     sqlx::query("DELETE FROM sessions WHERE id = $1")
         .bind(session_id)
@@ -105,6 +107,7 @@ pub async fn revoke_others(db: impl PgExecutor<'_>, user_id: Uuid, keep: Uuid) -
     Ok(())
 }
 
+/// Removes sessions whose expiry has passed
 pub async fn purge_expired(db: &PgPool) -> sqlx::Result<u64> {
     let result = sqlx::query("DELETE FROM sessions WHERE expires_at <= now()")
         .execute(db)

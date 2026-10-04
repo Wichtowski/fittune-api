@@ -17,7 +17,6 @@ use super::{
 use crate::{
     AppState,
     auth::signup::{self, NewUser},
-    router,
     users::{self, model::Role},
 };
 
@@ -45,7 +44,7 @@ struct Session {
 
 /// Creates or updates every fixture. Safe to run any number of times.
 pub async fn seed(state: &AppState, clock: Clock) -> Result<Summary> {
-    let api = Api::new(router(state.clone()));
+    let api = Api::new(state);
     let mut summary = Summary::default();
     let mut sessions = Vec::new();
 
@@ -166,7 +165,7 @@ async fn save_friends(api: &Api, sessions: &[Session]) -> Result<()> {
 /// Deletes every fixture account and everything it owns, leaving other accounts alone.
 /// Returns how many accounts were removed.
 pub async fn reset(state: &AppState) -> Result<usize> {
-    let api = Api::new(router(state.clone()));
+    let api = Api::new(state);
     let mut removed = 0;
     for account in &ACCOUNTS {
         let Some(user_id) = fixture_user_id(state, account).await? else {

@@ -74,10 +74,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Install cargo-audit
+      - name: Install dependency checks
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-audit
+          tool: cargo-audit,cargo-deny
 
       - name: Audit dependencies
         run: cargo audit
+
+      - name: Check dependency sources and requirements
+        run: cargo deny --all-features --locked check bans sources

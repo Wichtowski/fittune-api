@@ -58,15 +58,18 @@ through authenticated API endpoints with `Cache-Control: private, no-store`.
 | PUT | `/api/v1/train/progress-photos/{id}` | `201 ProgressPhoto`; replay returns `200` |
 | GET | `/api/v1/train/progress-photos?workout_id=&limit=50&offset=0` | `ProgressPhoto[]`, newest first |
 | GET | `/api/v1/train/progress-photos/{id}/file?size=full\|thumb` | JPEG image |
-| DELETE | `/api/v1/train/progress-photos/{id}` | `204`; deletes both stored images |
+| DELETE | `/api/v1/train/progress-photos/{id}` | `204`; removes the row and queues both images for deletion |
 
 `ProgressPhoto`: `{ id, workout_id, width, height, bytes, taken_at, created_at }`.
-Deleting an account removes its stored images. Deleting a workout keeps its photo in the user's
-gallery and clears the photo's `workout_id`.
+Deleting an account queues its stored images for deletion without depending on storage availability.
+Deleting a workout keeps its photo in the user's gallery and clears the photo's `workout_id`.
+Cleanup retries run in the background until storage deletes succeed.
+Uploads return `429` when all upload slots are occupied and `422` with a `file` field error when the user's count or byte quota is reached.
+The defaults are 500 photos and 512 MiB including thumbnails; uploads have a 120 second timeout.
 
 ## Health
 
-`GET /health` → `200 { "status": "ok", "version": "1.4.2", "database": "ok" }`, or `503` with
+`GET /health` → `200 { "status": "ok", "database": "ok" }`, or `503` with
 `"status": "degraded"` when Postgres is unreachable.
 
 ## Auth

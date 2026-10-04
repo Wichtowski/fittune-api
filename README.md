@@ -73,6 +73,38 @@ original file and its EXIF metadata are never stored. A thumbnail and full-size 
 in RustFS, and only authenticated API endpoints can read them. Use separate, random
 `FITTUNE_PHOTOS_ACCESS_KEY` and `FITTUNE_PHOTOS_SECRET_KEY` values outside local development.
 
+Uploads are limited to 500 photos and 512 MiB per user, counting both the full image and thumbnail.
+Older photos reserve twice their recorded full-image size because their thumbnail size was not tracked.
+`FITTUNE_PHOTO_MAX_COUNT` and `FITTUNE_PHOTO_MAX_BYTES` override these limits.
+One upload at a time is admitted before buffering or decoding; increase `FITTUNE_PHOTO_UPLOAD_CONCURRENCY` only with enough memory for each additional decode (up to 64 MiB plus buffers).
+The default fits the production API's 256 MiB memory limit.
+Photo uploads have a 120 second request timeout; other requests keep the 30 second timeout.
+A busy upload returns `429`; an exceeded photo quota returns `422` with a `file` field error.
+
+Photo and account deletion commit in Postgres first, with storage cleanup queued in the same transaction.
+Storage failure or missing configuration does not block account deletion.
+The API retries a bounded cleanup batch every minute, postponing failed keys for five minutes.
+S3 operations have a 15 second timeout so a stalled storage service cannot hold a cleanup lock indefinitely.
+Uploads register cleanup keys before writing objects, so interrupted uploads are reclaimed after one hour.
+For orphaned progress-photo objects left by older API versions, run `make reconcile-photos` locally or on the VPS:
+
+```bash
+docker compose -f docker-compose.prod.yml exec fittune-api /usr/local/bin/fittune-api reconcile-photos
+```
+
+The sweep queues only unreferenced progress-photo keys older than an hour and preserves active upload reservations and catalog media.
+It reports failed deletes and leaves them queued for retry.
+The regular test suite explicitly ignores the RustFS round trip.
+Run it separately against local storage after exporting the local photo configuration:
+
+```bash
+RUSTFS_TEST_ENDPOINT="$FITTUNE_PHOTOS_ENDPOINT" \
+RUSTFS_TEST_BUCKET="$FITTUNE_PHOTOS_BUCKET" \
+RUSTFS_TEST_ACCESS_KEY="$FITTUNE_PHOTOS_ACCESS_KEY" \
+RUSTFS_TEST_SECRET_KEY="$FITTUNE_PHOTOS_SECRET_KEY" \
+cargo test --lib photos::tests::rustfs_round_trip_when_configured -- --ignored
+```
+
 `.env.example` sets `FITTUNE_REGISTRATION=open`, so local sign-up works without invites.
 Admins manage the shared exercise catalog, list users and issue invite codes:
 
@@ -160,12 +192,31 @@ rm /tmp/off_products.dump
 | `FITTUNE_LOG` | `fittune_api=info,tower_http=info,sqlx=warn,info` | tracing filter |
 | `OPENAI_API_KEY` | (unset) | Optional server key from the dedicated GitHub secret; AI OCR is disabled when absent |
 | `FITTUNE_OCR_ENDPOINT` | (unset) | Private RapidOCR sidecar URL; local OCR/manual entry remain available when absent |
-| `FITTUNE_APP_VERSION` | `dev` | Reported by `/health`; set to the release tag on deploy |
+| `FITTUNE_APP_VERSION` | `dev` | Logged at startup; set to the release tag on deploy |
+| `FITTUNE_PHOTO_MAX_COUNT` | `500` | Per-user progress-photo count limit |
+| `FITTUNE_PHOTO_MAX_BYTES` | `536870912` | Per-user storage byte limit including thumbnails |
+| `FITTUNE_PHOTO_UPLOAD_CONCURRENCY` | `1` | Concurrent uploads including buffering and decode; 1 to 4 |
 | `FITTUNE_PHOTOS_ENDPOINT` | — | RustFS S3 endpoint; photo API is unavailable when unset |
 | `FITTUNE_PHOTOS_BUCKET` | — | Private bucket, created by Compose |
 | `FITTUNE_PHOTOS_ACCESS_KEY` / `FITTUNE_PHOTOS_SECRET_KEY` | — | RustFS credentials; required with the endpoint |
 | `FITTUNE_REGISTRATION` | `invite_only` | `invite_only` (sign-up needs an admin's invite code) or `open` (local development only) |
 | `FITTUNE_CLIENT_IP_HEADER` | (unset) | Header with the client IP set by a trusted proxy, used to rate-limit invite guessing; `X-Real-IP` in production |
+
+Rate limit counters are process-local and reset on restart.
+Run a single API instance; before scaling to multiple instances, move the counters to Postgres or Redis so limits are shared and survive restarts.
+Login and password confirmation atomically reserve capacity before verification, with a limit of 10 failed or in-flight attempts per key per 15 minutes.
+Verified successes release their reservation only in the original window; cancelled attempts remain counted.
+Registration remains limited to 30 attempts per client per hour, and friend actions to 300 per user per hour.
+
+With `FITTUNE_CLIENT_IP_HEADER` configured, a missing, repeated or invalid IP header rejects the request with `400`.
+`X-Forwarded-For` uses the last hop; other headers must contain a single IP address.
+The trusted proxy must overwrite this header, and clients must have no direct access to the API.
+Production Compose exposes the API only to Docker networks and sets `X-Real-IP`; the Caddy patch in `docs/platform-edge-progress-photos.patch` uses `header_up X-Real-IP {client_ip}` to overwrite client input.
+When the header is unset, the API uses the socket peer address and emits a startup warning; behind a proxy that would give every client the proxy's allowance.
+Invalid CORS origins fail configuration loading instead of being silently discarded.
+
+CI runs `cargo audit` for known vulnerabilities and `cargo deny --all-features --locked check bans sources` for wildcard requirements and unapproved dependency sources.
+The source policy permits crates.io only; duplicate transitive versions are reported as warnings.
 
 ## Deployment
 

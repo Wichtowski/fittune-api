@@ -37,6 +37,7 @@ uuid = { version = "1.26.1", features = ["v4", "serde"] }
 dev-fixtures = ["tower/util"]
 
 [dev-dependencies]
+tokio = { version = "1.53.1", features = ["test-util"] }
 http-body-util = "0.1.5"
 tower = { version = "0.5.3", features = ["util"] }
 

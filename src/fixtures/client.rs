@@ -5,7 +5,8 @@ use anyhow::{Context, Result, bail};
 use axum::{
     Router,
     body::Body,
-    http::{Method, Request, StatusCode, header},
+    extract::ConnectInfo,
+    http::{HeaderName, Method, Request, StatusCode, header},
 };
 use serde_json::Value;
 use tower::ServiceExt;
@@ -15,11 +16,15 @@ const MAX_RESPONSE_BYTES: usize = 16 * 1024 * 1024;
 #[derive(Clone)]
 pub struct Api {
     router: Router,
+    client_ip_header: Option<HeaderName>,
 }
 
 impl Api {
-    pub fn new(router: Router) -> Self {
-        Self { router }
+    pub fn new(state: &crate::AppState) -> Self {
+        Self {
+            router: crate::router(state.clone()),
+            client_ip_header: state.config.client_ip_header.clone(),
+        }
     }
 
     pub async fn call(
@@ -33,10 +38,13 @@ impl Api {
             .method(method)
             .uri(uri)
             .header(header::USER_AGENT, "fittune-api seed-dev");
+        if let Some(name) = &self.client_ip_header {
+            builder = builder.header(name, "127.0.0.1");
+        }
         if let Some(token) = token {
             builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
         }
-        let request = match body {
+        let mut request = match body {
             Some(body) => builder
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(body.to_string())),
@@ -44,6 +52,9 @@ impl Api {
         }
         .context("invalid fixture request")?;
 
+        request
+            .extensions_mut()
+            .insert(ConnectInfo(std::net::SocketAddr::from(([127, 0, 0, 1], 0))));
         let response = self.router.clone().oneshot(request).await?;
         let status = response.status();
         let bytes = axum::body::to_bytes(response.into_body(), MAX_RESPONSE_BYTES).await?;
