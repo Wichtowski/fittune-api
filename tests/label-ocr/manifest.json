@@ -1,0 +1,2266 @@
+{
+  "dataset": "openfoodfacts/nutrient-detection-layout",
+  "license": "CC-BY-SA-3.0",
+  "attribution": "Open Food Facts contributors",
+  "entries": [
+    {
+      "id": "pl-01",
+      "language": "pl",
+      "split": "development",
+      "barcode": "5900012008610",
+      "image_url": "https://images.openfoodfacts.org/images/products/590/001/200/8610/3.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "290c7e0767e045a7596e6f5f5069210ea931a122c0b67b5fd3789dd3b013a54b",
+      "crop": [
+        0.01,
+        0.42,
+        0.99,
+        0.98
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 232,
+          "fat_g": 19.2,
+          "saturated_fat_g": 1.4,
+          "carbs_g": 8.8,
+          "sugars_g": 1.2,
+          "fiber_g": 4.6,
+          "protein_g": 3.8,
+          "salt_g": 1.5
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "5900012008610",
+      "features": []
+    },
+    {
+      "id": "pl-02",
+      "language": "pl",
+      "split": "development",
+      "barcode": "8008857300283",
+      "image_url": "https://images.openfoodfacts.org/images/products/800/885/730/0283/3.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "b2e304c16c59a42751ac1341421973ab953685687d2bf928bb9d2bfc62c946ae",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 360,
+          "fat_g": 1.3,
+          "saturated_fat_g": 0.2,
+          "carbs_g": 73,
+          "sugars_g": 3,
+          "fiber_g": 2.9,
+          "protein_g": 12.5,
+          "salt_g": 0.007
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "tosca-pasta-shared-label",
+      "features": []
+    },
+    {
+      "id": "pl-03",
+      "language": "pl",
+      "split": "development",
+      "barcode": "5900196004040",
+      "image_url": "https://images.openfoodfacts.org/images/products/590/019/600/4040/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "a8b756bc1243094a300094febdf6768765ed05082868b65833fbae1d5c5951e7",
+      "crop": [
+        0.04,
+        0.58,
+        0.96,
+        0.86
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 107,
+          "fat_g": 2.5,
+          "saturated_fat_g": 1.2,
+          "carbs_g": 2.2,
+          "sugars_g": 0.5,
+          "fiber_g": null,
+          "protein_g": 19,
+          "salt_g": 2
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "5900196004040",
+      "features": []
+    },
+    {
+      "id": "pl-04",
+      "language": "pl",
+      "split": "development",
+      "barcode": "8711299020151",
+      "image_url": "https://images.openfoodfacts.org/images/products/871/129/902/0151/10.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "043e1f66a57ca7963be3956447678cd2fa5b361e54590463a23ebb54ba53e4f6",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 504,
+          "fat_g": 25.4,
+          "saturated_fat_g": 15.2,
+          "carbs_g": 60.9,
+          "sugars_g": 47,
+          "fiber_g": null,
+          "protein_g": 6.2,
+          "salt_g": 0.1
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "8711299020151",
+      "features": []
+    },
+    {
+      "id": "pl-05",
+      "language": "pl",
+      "split": "development",
+      "barcode": "5400265026046",
+      "image_url": "https://images.openfoodfacts.org/images/products/540/026/502/6046/4.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "5a120171828cfcd18476d4c5063c55aeac5504af43ac7eb4f3eefe4f78086559",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 463,
+          "fat_g": 19,
+          "saturated_fat_g": 11,
+          "carbs_g": 67,
+          "sugars_g": 50,
+          "fiber_g": null,
+          "protein_g": 4.8,
+          "salt_g": 0.08
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "5400265026046",
+      "features": [
+        "multiple-columns-or-inline-bases",
+        "curvature-glare-or-perspective"
+      ]
+    },
+    {
+      "id": "pl-06",
+      "language": "pl",
+      "split": "development",
+      "barcode": "4001686578636",
+      "image_url": "https://images.openfoodfacts.org/images/products/400/168/657/8636/4.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "a9ba1bbac3974b961806adb692f5b055e11eaa421a81161fa6b731c34f3520de",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 394,
+          "fat_g": 6.4,
+          "saturated_fat_g": 3.2,
+          "carbs_g": 84,
+          "sugars_g": 60,
+          "fiber_g": null,
+          "protein_g": 1,
+          "salt_g": 0.002
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "4001686578636",
+      "features": []
+    },
+    {
+      "id": "pl-07",
+      "language": "pl",
+      "split": "development",
+      "barcode": "57947297",
+      "image_url": "https://images.openfoodfacts.org/images/products/000/005/794/7297/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "c939a46b579a07291ece181b8bfc308485b320e38af51a02323f22f8c3bcab3a",
+      "crop": [
+        0,
+        0,
+        0.9,
+        0.7
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 270,
+          "fat_g": 5.3,
+          "saturated_fat_g": 0.7,
+          "carbs_g": 47,
+          "sugars_g": 4.2,
+          "fiber_g": 8.5,
+          "protein_g": 4.5,
+          "salt_g": 1.5
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "57947297",
+      "features": [
+        "multiple-columns-or-inline-bases"
+      ]
+    },
+    {
+      "id": "pl-08",
+      "language": "pl",
+      "split": "development",
+      "barcode": "8713576275032",
+      "image_url": "https://images.openfoodfacts.org/images/products/871/357/627/5032/5.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "099ad6279a56e464fda26bf351cb60416290db7dff8c98e069139114b95ba419",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 467,
+          "fat_g": 23,
+          "saturated_fat_g": 3.5,
+          "carbs_g": 46.5,
+          "sugars_g": 1,
+          "fiber_g": 9,
+          "protein_g": 14,
+          "salt_g": 1.1
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "8713576275032",
+      "features": []
+    },
+    {
+      "id": "pl-09",
+      "language": "pl",
+      "split": "development",
+      "barcode": "5902729020534",
+      "image_url": "https://images.openfoodfacts.org/images/products/590/272/902/0534/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "87743e4871159563b872a8c63b8498368fd89193c773d75ba1fa50abd44a2a82",
+      "crop": [
+        0.35,
+        0.22,
+        0.89,
+        0.54
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 325,
+          "fat_g": null,
+          "saturated_fat_g": null,
+          "carbs_g": 75,
+          "sugars_g": 63,
+          "fiber_g": 7.5,
+          "protein_g": 2.5,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "5902729020534",
+      "features": [
+        "inequality",
+        "multiple-columns-or-inline-bases",
+        "curvature-glare-or-perspective"
+      ]
+    },
+    {
+      "id": "pl-10",
+      "language": "pl",
+      "split": "development",
+      "barcode": "4028856010246",
+      "image_url": "https://images.openfoodfacts.org/images/products/402/885/601/0246/3.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "baaf2f646d8485922effb7de9f66b8a2f7e83592cc9d31d5a0a0a83760be0585",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 108,
+          "fat_g": 8.3,
+          "saturated_fat_g": 1.3,
+          "carbs_g": 6.5,
+          "sugars_g": 5.9,
+          "fiber_g": null,
+          "protein_g": 1.1,
+          "salt_g": 1.8
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "4028856010246",
+      "features": [
+        "curvature-glare-or-perspective"
+      ]
+    },
+    {
+      "id": "pl-11",
+      "language": "pl",
+      "split": "development",
+      "barcode": "5900259104359",
+      "image_url": "https://images.openfoodfacts.org/images/products/590/025/910/4359/4.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "f662ea6ca6daae1fccc2b46b47980b2a20bda5f5c4ec78e130b6e287016ee687",
+      "crop": [
+        0.3,
+        0.08,
+        0.72,
+        0.67
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 545,
+          "fat_g": 33,
+          "saturated_fat_g": 4.1,
+          "carbs_g": 53,
+          "sugars_g": 2.8,
+          "fiber_g": 4.3,
+          "protein_g": 6.2,
+          "salt_g": 1.6
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "5900259104359",
+      "features": [
+        "multiple-columns-or-inline-bases",
+        "curvature-glare-or-perspective"
+      ]
+    },
+    {
+      "id": "pl-12",
+      "language": "pl",
+      "split": "development",
+      "barcode": "5900531001079",
+      "image_url": "https://images.openfoodfacts.org/images/products/590/053/100/1079/3.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "45afb546d1b42a7322b37c06c4a9bce7feb14f24b8042335a65f434b1ea6b625",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "ml",
+        "values": {
+          "energy_kcal": 292,
+          "fat_g": 30,
+          "saturated_fat_g": 18,
+          "carbs_g": 3.3,
+          "sugars_g": 3.3,
+          "fiber_g": null,
+          "protein_g": 2.2,
+          "salt_g": 0.08
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "5900531001079",
+      "features": [
+        "volume"
+      ]
+    },
+    {
+      "id": "pl-13",
+      "language": "pl",
+      "split": "development",
+      "barcode": "9020200025338",
+      "image_url": "https://images.openfoodfacts.org/images/products/902/020/002/5338/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "bf224695fd60e6203d897b612f3bd2a2d613fef2254bf96a616aa299fa5137a2",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 123,
+          "fat_g": 3.2,
+          "saturated_fat_g": 1.1,
+          "carbs_g": 4,
+          "sugars_g": 1.8,
+          "fiber_g": 6,
+          "protein_g": 17,
+          "salt_g": 1.3
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 180,
+      "difficulty": "hard",
+      "package_group": "9020200025338",
+      "features": [
+        "rotation"
+      ]
+    },
+    {
+      "id": "pl-14",
+      "language": "pl",
+      "split": "development",
+      "barcode": "8003474530570",
+      "image_url": "https://images.openfoodfacts.org/images/products/800/347/453/0570/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "0f1a3181c345e81bf9e436a347ae45388ac1d64e22eae2d4fd67795bf38c2779",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 355,
+          "fat_g": 1.2,
+          "saturated_fat_g": 0.2,
+          "carbs_g": 72.5,
+          "sugars_g": 1,
+          "fiber_g": null,
+          "protein_g": 11.5,
+          "salt_g": 0.003
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "8003474530570",
+      "features": [
+        "curvature-glare-or-perspective"
+      ]
+    },
+    {
+      "id": "pl-15",
+      "language": "pl",
+      "split": "development",
+      "barcode": "5400265031279",
+      "image_url": "https://images.openfoodfacts.org/images/products/540/026/503/1279/5.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "1a7971fbb15454960861426272e9bd080def998a1e74b522e605c099799c8892",
+      "crop": [
+        0,
+        0.29,
+        1,
+        0.78
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 440,
+          "fat_g": 19,
+          "saturated_fat_g": 12,
+          "carbs_g": 53,
+          "sugars_g": 45,
+          "fiber_g": null,
+          "protein_g": 2.9,
+          "salt_g": 0
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "5400265031279",
+      "features": [
+        "multiple-columns-or-inline-bases"
+      ]
+    },
+    {
+      "id": "pl-16",
+      "language": "pl",
+      "split": "development",
+      "barcode": "4001686216019",
+      "image_url": "https://images.openfoodfacts.org/images/products/400/168/621/6019/5.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "39c304528cfd4dd2c0b59caa91fa303a92ea97f74ce9dcf0ed27197a45cd70a9",
+      "crop": [
+        0.5,
+        0.08,
+        0.93,
+        0.4
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 333,
+          "fat_g": null,
+          "saturated_fat_g": 0.1,
+          "carbs_g": 83,
+          "sugars_g": 48,
+          "fiber_g": null,
+          "protein_g": null,
+          "salt_g": 1.3
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "4001686216019",
+      "features": [
+        "inequality",
+        "curvature-glare-or-perspective"
+      ]
+    },
+    {
+      "id": "pl-17",
+      "language": "pl",
+      "split": "development",
+      "barcode": "5900125001911",
+      "image_url": "https://images.openfoodfacts.org/images/products/590/012/500/1911/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "b46c9533aa1fb51bf164c7b5b98b0e5599037d282a73675e865e54471ce98795",
+      "crop": [
+        0,
+        0.44,
+        1,
+        0.75
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 382,
+          "fat_g": 4.2,
+          "saturated_fat_g": 0.7,
+          "carbs_g": 75,
+          "sugars_g": 12,
+          "fiber_g": 4.9,
+          "protein_g": 8.5,
+          "salt_g": 0.63
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "5900125001911",
+      "features": [
+        "multiple-columns-or-inline-bases"
+      ]
+    },
+    {
+      "id": "pl-18",
+      "language": "pl",
+      "split": "development",
+      "barcode": "8008857310541",
+      "image_url": "https://images.openfoodfacts.org/images/products/800/885/731/0541/5.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "89a30885b14854cfa29b95ce0d3a91c5daa3b28e7ec8efabdd5d01d2c4f02660",
+      "crop": [
+        0,
+        0.18,
+        1,
+        0.88
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 360,
+          "fat_g": 1.3,
+          "saturated_fat_g": 0.2,
+          "carbs_g": 73,
+          "sugars_g": 3,
+          "fiber_g": 2.9,
+          "protein_g": 12.5,
+          "salt_g": 0.007
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "tosca-pasta-shared-label",
+      "features": []
+    },
+    {
+      "id": "pl-19",
+      "language": "pl",
+      "split": "development",
+      "barcode": "5906425142972",
+      "image_url": "https://images.openfoodfacts.org/images/products/590/642/514/2972/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "a29fadd822c345e91d9e01cb76ac3fff0554b387ccbd824db13fd8a237016a50",
+      "crop": [
+        0.12,
+        0.37,
+        0.96,
+        0.67
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 270,
+          "fat_g": 26,
+          "saturated_fat_g": 1.9,
+          "carbs_g": 8.7,
+          "sugars_g": 6,
+          "fiber_g": null,
+          "protein_g": 0.5,
+          "salt_g": 1.5
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "5906425142972",
+      "features": [
+        "inequality",
+        "curvature-glare-or-perspective"
+      ]
+    },
+    {
+      "id": "pl-20",
+      "language": "pl",
+      "split": "development",
+      "barcode": "4771085204008",
+      "image_url": "https://images.openfoodfacts.org/images/products/477/108/520/4008/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "72d2afa438df43abef74fbcfb86e47fb0354657d5f8e2960ee0c8e80686a1425",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 365,
+          "fat_g": 6.7,
+          "saturated_fat_g": 1.3,
+          "carbs_g": 67.5,
+          "sugars_g": 1.3,
+          "fiber_g": 9,
+          "protein_g": 13.8,
+          "salt_g": 0.02
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "4771085204008",
+      "features": []
+    },
+    {
+      "id": "pl-21",
+      "language": "pl",
+      "split": "heldout",
+      "barcode": "4032489396028",
+      "image_url": "https://images.openfoodfacts.org/images/products/403/248/939/6028/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "2b18ee73d6a6629b2d2570583647e9ff947403c38593ba4af54ad3c7cd6d2c87",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 322,
+          "fat_g": 0.18,
+          "saturated_fat_g": 0,
+          "carbs_g": 77.1,
+          "sugars_g": 36.7,
+          "fiber_g": null,
+          "protein_g": 3.1,
+          "salt_g": 0.34
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "4032489396028",
+      "features": [
+        "multiple-columns-or-inline-bases"
+      ]
+    },
+    {
+      "id": "pl-22",
+      "language": "pl",
+      "split": "heldout",
+      "barcode": "5907180314093",
+      "image_url": "https://images.openfoodfacts.org/images/products/590/718/031/4093/1.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "2587af00a710d8eaf571a8efd0411b1366a6767cac15cd97a6ba512223cf69a6",
+      "crop": [
+        0.46,
+        0.33,
+        0.9,
+        0.62
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 26,
+          "fat_g": 0.7,
+          "saturated_fat_g": 0.3,
+          "carbs_g": 3.9,
+          "sugars_g": 2.1,
+          "fiber_g": null,
+          "protein_g": 0.7,
+          "salt_g": 0.65
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "5907180314093",
+      "features": []
+    },
+    {
+      "id": "pl-23",
+      "language": "pl",
+      "split": "heldout",
+      "barcode": "5907368740294",
+      "image_url": "https://images.openfoodfacts.org/images/products/590/736/874/0294/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "fdbf11e275f68ae43b0f4e703949b17cba36be2b1d6c299b1b2d684dce9d92bf",
+      "crop": [
+        0.64,
+        0.08,
+        1,
+        0.87
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 52,
+          "fat_g": 2,
+          "saturated_fat_g": 0.9,
+          "carbs_g": 1.7,
+          "sugars_g": 0.7,
+          "fiber_g": null,
+          "protein_g": 6.8,
+          "salt_g": 1.3
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "5907368740294",
+      "features": []
+    },
+    {
+      "id": "pl-24",
+      "language": "pl",
+      "split": "heldout",
+      "barcode": "4056489140474",
+      "image_url": "https://images.openfoodfacts.org/images/products/405/648/914/0474/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "d5028e13003d138e1d72fab2d0dd052c31dc753aa02abb340d90a009fd2e9846",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 217,
+          "fat_g": 10.7,
+          "saturated_fat_g": 3.4,
+          "carbs_g": 25.6,
+          "sugars_g": 22.9,
+          "fiber_g": null,
+          "protein_g": 0.3,
+          "salt_g": 0.17
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 90,
+      "difficulty": "readable",
+      "package_group": "4056489140474",
+      "features": [
+        "multiple-columns-or-inline-bases",
+        "rotation"
+      ]
+    },
+    {
+      "id": "pl-25",
+      "language": "pl",
+      "split": "heldout",
+      "barcode": "5701397388027",
+      "image_url": "https://images.openfoodfacts.org/images/products/570/139/738/8027/3.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "3c20cfe99dad4fcccb1f68ca7aa045efb30cd821c6f8d3920a980e9b0ebfec20",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 498,
+          "fat_g": 27,
+          "saturated_fat_g": 1.9,
+          "carbs_g": 61,
+          "sugars_g": 7.9,
+          "fiber_g": 1.1,
+          "protein_g": 2.1,
+          "salt_g": 2.5
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "5701397388027",
+      "features": [
+        "multiple-columns-or-inline-bases",
+        "curvature-glare-or-perspective"
+      ]
+    },
+    {
+      "id": "pl-26",
+      "language": "pl",
+      "split": "heldout",
+      "barcode": "4770237055185",
+      "image_url": "https://images.openfoodfacts.org/images/products/477/023/705/5185/3.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "0aa16950ba536acbd6e7ee653b61308b5b9c375ee6f2daa8f36fa7ab383f50a4",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 280,
+          "fat_g": 15,
+          "saturated_fat_g": 1.7,
+          "carbs_g": 32,
+          "sugars_g": 2.6,
+          "fiber_g": 0.8,
+          "protein_g": 3.8,
+          "salt_g": 0.4
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "4770237055185",
+      "features": [
+        "multiple-columns-or-inline-bases"
+      ]
+    },
+    {
+      "id": "pl-27",
+      "language": "pl",
+      "split": "heldout",
+      "barcode": "8718403887518",
+      "image_url": "https://images.openfoodfacts.org/images/products/871/840/388/7518/27.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "dbf86cde7b516445c0c8feefac16e1ff889ecb69464b7101a43829b076e08a99",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 528,
+          "fat_g": 32,
+          "saturated_fat_g": 29,
+          "carbs_g": 58,
+          "sugars_g": 16,
+          "fiber_g": null,
+          "protein_g": 2,
+          "salt_g": 0.01
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "8718403887518",
+      "features": []
+    },
+    {
+      "id": "pl-28",
+      "language": "pl",
+      "split": "heldout",
+      "barcode": "5902346010833",
+      "image_url": "https://images.openfoodfacts.org/images/products/590/234/601/0833/3.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "97346a2ed1fc3b79131372fab023255f0479d15a8aaa0547feba41f2461986a1",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 348,
+          "fat_g": 2.3,
+          "saturated_fat_g": 0.5,
+          "carbs_g": 60.5,
+          "sugars_g": 2.7,
+          "fiber_g": null,
+          "protein_g": 16.5,
+          "salt_g": 0.22
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 90,
+      "difficulty": "readable",
+      "package_group": "5902346010833",
+      "features": [
+        "multiple-columns-or-inline-bases",
+        "rotation"
+      ]
+    },
+    {
+      "id": "pl-29",
+      "language": "pl",
+      "split": "heldout",
+      "barcode": "5900749610445",
+      "image_url": "https://images.openfoodfacts.org/images/products/590/074/961/0445/3.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "6cc4920fd154b962113c21a4b95d08ce9e308e49f89874c2adeea7bb6d4bbc0e",
+      "crop": [
+        0.08,
+        0,
+        0.97,
+        0.65
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 366,
+          "fat_g": 4.5,
+          "saturated_fat_g": 0.8,
+          "carbs_g": 65,
+          "sugars_g": 23,
+          "fiber_g": 7.7,
+          "protein_g": 13,
+          "salt_g": 0.35
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "5900749610445",
+      "features": [
+        "multiple-columns-or-inline-bases"
+      ]
+    },
+    {
+      "id": "pl-30",
+      "language": "pl",
+      "split": "heldout",
+      "barcode": "7613032920418",
+      "image_url": "https://images.openfoodfacts.org/images/products/761/303/292/0418/3.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "053f6a107752a9a4dc5cec640473772e5683266bfd432952b56547465c5a2ab6",
+      "crop": [
+        0,
+        0,
+        0.36,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 264,
+          "fat_g": 14.4,
+          "saturated_fat_g": 8.3,
+          "carbs_g": 29.4,
+          "sugars_g": 25.6,
+          "fiber_g": 1.2,
+          "protein_g": 3,
+          "salt_g": 0.14
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "7613032920418",
+      "features": [
+        "multiple-columns-or-inline-bases",
+        "g-and-ml-bases"
+      ],
+      "column_unit": "g"
+    },
+    {
+      "id": "en-01",
+      "language": "en",
+      "split": "development",
+      "barcode": "0024842182113",
+      "image_url": "https://images.openfoodfacts.org/images/products/002/484/218/2113/3.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "a6bc476c48a52d4d927e74ca51d54372415166a3f049ab7684808b7cccbb0d1e",
+      "crop": [
+        0,
+        0,
+        0.5,
+        0.91
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 283.0188679245283,
+          "fat_g": 7.547169811320755,
+          "saturated_fat_g": 2.358490566037736,
+          "carbs_g": 42.45283018867924,
+          "sugars_g": 0.9433962264150944,
+          "fiber_g": 2.830188679245283,
+          "protein_g": 11.320754716981131,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "0024842182113",
+      "features": [
+        "portion-only"
+      ]
+    },
+    {
+      "id": "en-02",
+      "language": "en",
+      "split": "development",
+      "barcode": "4008097501512",
+      "image_url": "https://images.openfoodfacts.org/images/products/400/809/750/1512/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "5d9dd0caad5a7b2377df08a279f4fb0aeb0d724049a1844a049cacca7de0ef9c",
+      "crop": [
+        0.14,
+        0.22,
+        0.83,
+        0.79
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 435.0,
+          "fat_g": 17.0,
+          "saturated_fat_g": 10.0,
+          "carbs_g": 58.0,
+          "sugars_g": 8.4,
+          "fiber_g": null,
+          "protein_g": 11.0,
+          "salt_g": 4.0
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "4008097501512",
+      "features": []
+    },
+    {
+      "id": "en-03",
+      "language": "en",
+      "split": "development",
+      "barcode": "0011110613196",
+      "image_url": "https://images.openfoodfacts.org/images/products/001/111/061/3196/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "961209f1c3c85190248c066005fb0c4b5a201d2d94148a4b1e4d117a624db461",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 571.4285714285714,
+          "fat_g": 50.0,
+          "saturated_fat_g": 7.142857142857143,
+          "carbs_g": 14.285714285714286,
+          "sugars_g": 3.5714285714285716,
+          "fiber_g": 7.142857142857143,
+          "protein_g": 25.0,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "0011110613196",
+      "features": [
+        "portion-only"
+      ]
+    },
+    {
+      "id": "en-04",
+      "language": "en",
+      "split": "development",
+      "barcode": "8411206005003",
+      "image_url": "https://images.openfoodfacts.org/images/products/841/120/600/5003/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "3cacf91866292226fc8a5a472a085ca0d2891e2839a4425787228d3bb620028e",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 529.0,
+          "fat_g": 29.0,
+          "saturated_fat_g": 3.7,
+          "carbs_g": 59.4,
+          "sugars_g": 2.4,
+          "fiber_g": 3.3,
+          "protein_g": 5.8,
+          "salt_g": 2.4
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "8411206005003",
+      "features": []
+    },
+    {
+      "id": "en-05",
+      "language": "en",
+      "split": "development",
+      "barcode": "0812050007768",
+      "image_url": "https://images.openfoodfacts.org/images/products/081/205/000/7768/1.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "ad0b7130dc3db601ffaacd25de6d8ee56a9974c5d5ce564c426ad8f15072887e",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 311.11111111111114,
+          "fat_g": 1.1111111111111112,
+          "saturated_fat_g": 0.0,
+          "carbs_g": 66.66666666666667,
+          "sugars_g": 2.2222222222222223,
+          "fiber_g": 4.444444444444445,
+          "protein_g": 11.11111111111111,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "0812050007768",
+      "features": [
+        "portion-only"
+      ]
+    },
+    {
+      "id": "en-06",
+      "language": "en",
+      "split": "development",
+      "barcode": "0705632793121",
+      "image_url": "https://images.openfoodfacts.org/images/products/070/563/279/3121/4.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "9befb841acc5946c38a38f43c7dcd33264b63961a33b765cf0ffdada17de44aa",
+      "crop": [
+        0,
+        0.62,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 564.76,
+          "fat_g": 44.76,
+          "saturated_fat_g": 15.2,
+          "carbs_g": 32.28,
+          "sugars_g": 24.0,
+          "fiber_g": 8.28,
+          "protein_g": 8.2,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "0705632793121",
+      "features": []
+    },
+    {
+      "id": "en-07",
+      "language": "en",
+      "split": "development",
+      "barcode": "8436006830020",
+      "image_url": "https://images.openfoodfacts.org/images/products/843/600/683/0020/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "623865058a5f2962f8d02fcba850d47b4001a022e9fbce5d0a5a022b28985115",
+      "crop": [
+        0.05,
+        0.76,
+        0.98,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 570.0,
+          "fat_g": 52.4,
+          "saturated_fat_g": 32.8,
+          "carbs_g": 26.4,
+          "sugars_g": 23.0,
+          "fiber_g": 4.6,
+          "protein_g": 6.6,
+          "salt_g": 0.03
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "8436006830020",
+      "features": []
+    },
+    {
+      "id": "en-08",
+      "language": "en",
+      "split": "development",
+      "barcode": "5000128931472",
+      "image_url": "https://images.openfoodfacts.org/images/products/500/012/893/1472/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "50d35b6a86916d6636d5d770f5782c2b8c956b376f2bb71c188245276e6009c8",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "ml",
+        "values": {
+          "energy_kcal": 14.0,
+          "fat_g": null,
+          "saturated_fat_g": null,
+          "carbs_g": 2.8,
+          "sugars_g": 2.8,
+          "fiber_g": 0.5,
+          "protein_g": null,
+          "salt_g": 0.03
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "5000128931472",
+      "features": [
+        "volume",
+        "inequality",
+        "multiple-columns-or-inline-bases"
+      ]
+    },
+    {
+      "id": "en-09",
+      "language": "en",
+      "split": "development",
+      "barcode": "8422424100630",
+      "image_url": "https://images.openfoodfacts.org/images/products/842/242/410/0630/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "485ed48d0d9fb253b34bcef93e894abf7c4d0bcda94317adc5445d9173b57fc1",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 332.0,
+          "fat_g": 8.9,
+          "saturated_fat_g": 1.8,
+          "carbs_g": 54.0,
+          "sugars_g": 0.9,
+          "fiber_g": 2.1,
+          "protein_g": 7.9,
+          "salt_g": 1.5
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "8422424100630",
+      "features": []
+    },
+    {
+      "id": "en-10",
+      "language": "en",
+      "split": "development",
+      "barcode": "8024046071017",
+      "image_url": "https://images.openfoodfacts.org/images/products/802/404/607/1017/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "1d933bff8316c27a5054d0ab3a1d8bdca98657599dc64145c9804dfe315ecaaf",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 351.0,
+          "fat_g": 1.6,
+          "saturated_fat_g": 0.25,
+          "carbs_g": 75.2,
+          "sugars_g": 0.71,
+          "fiber_g": 2.5,
+          "protein_g": 7.8,
+          "salt_g": 0.0005
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "8024046071017",
+      "features": [
+        "multiple-columns-or-inline-bases"
+      ]
+    },
+    {
+      "id": "en-11",
+      "language": "en",
+      "split": "development",
+      "barcode": "4056489052906",
+      "image_url": "https://images.openfoodfacts.org/images/products/405/648/905/2906/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "094d5eebbc5dd7ffc9769ef5330ec1a6699ff7f89f046ccfe7c416a061e49106",
+      "crop": [
+        0,
+        0,
+        1,
+        0.66
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 419.0,
+          "fat_g": 14.0,
+          "saturated_fat_g": 1.5,
+          "carbs_g": 62.0,
+          "sugars_g": 17.0,
+          "fiber_g": 8.7,
+          "protein_g": 6.8,
+          "salt_g": 0.49
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "4056489052906",
+      "features": [
+        "multiple-columns-or-inline-bases"
+      ]
+    },
+    {
+      "id": "en-12",
+      "language": "en",
+      "split": "development",
+      "barcode": "0041679749883",
+      "image_url": "https://images.openfoodfacts.org/images/products/004/167/974/9883/5.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "27da207b0753cbfd2c8b9c82d6f78ebacc4cb4f1a0ba58cf65eb55f2da5c01dc",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": null,
+        "values": {
+          "energy_kcal": null,
+          "fat_g": null,
+          "saturated_fat_g": null,
+          "carbs_g": null,
+          "sugars_g": null,
+          "fiber_g": null,
+          "protein_g": null,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "0041679749883",
+      "features": [
+        "multiple-columns-or-inline-bases",
+        "ambiguous-or-missing-header"
+      ]
+    },
+    {
+      "id": "en-13",
+      "language": "en",
+      "split": "development",
+      "barcode": "3258561100500",
+      "image_url": "https://images.openfoodfacts.org/images/products/325/856/110/0500/5.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "64901cea882fe4d5aad5e3f6934e641d95f15e0c2f506c8a76e51413012acdda",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 350.0,
+          "fat_g": 5.7,
+          "saturated_fat_g": 1.2,
+          "carbs_g": 51.0,
+          "sugars_g": 2.8,
+          "fiber_g": 9.6,
+          "protein_g": 18.6,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "3258561100500",
+      "features": []
+    },
+    {
+      "id": "en-14",
+      "language": "en",
+      "split": "development",
+      "barcode": "4018356008157",
+      "image_url": "https://images.openfoodfacts.org/images/products/401/835/600/8157/6.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "13f39417d6bb7967fcaff16c3f4245c995a89287fd2498575d5d257c9b35f4e6",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": null,
+        "values": {
+          "energy_kcal": null,
+          "fat_g": null,
+          "saturated_fat_g": null,
+          "carbs_g": null,
+          "sugars_g": null,
+          "fiber_g": null,
+          "protein_g": null,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "4018356008157",
+      "features": [
+        "ambiguous-or-missing-header"
+      ]
+    },
+    {
+      "id": "en-15",
+      "language": "en",
+      "split": "development",
+      "barcode": "58221372",
+      "image_url": "https://images.openfoodfacts.org/images/products/000/005/822/1372/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "dab76aad67ed90cd1b76eecbbeb96162e704df94db5a9407c578aba4db327baa",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 573.0,
+          "fat_g": 37.0,
+          "saturated_fat_g": 7.4,
+          "carbs_g": 54.0,
+          "sugars_g": 53.0,
+          "fiber_g": 2.2,
+          "protein_g": 4.9,
+          "salt_g": 0.09
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "58221372",
+      "features": []
+    },
+    {
+      "id": "en-16",
+      "language": "en",
+      "split": "development",
+      "barcode": "3395501932576",
+      "image_url": "https://images.openfoodfacts.org/images/products/339/550/193/2576/9.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "269761b3fc5b79b5f9e188bd9ab7768b17ff59dcfbf021854ad9fd4f8f1f7d91",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 403.0,
+          "fat_g": null,
+          "saturated_fat_g": null,
+          "carbs_g": 99.0,
+          "sugars_g": 98.0,
+          "fiber_g": null,
+          "protein_g": null,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "3395501932576",
+      "features": [
+        "inequality",
+        "multiple-columns-or-inline-bases",
+        "curvature-glare-or-perspective"
+      ]
+    },
+    {
+      "id": "en-17",
+      "language": "en",
+      "split": "development",
+      "barcode": "29094295",
+      "image_url": "https://images.openfoodfacts.org/images/products/000/002/909/4295/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "ad231e22375f9faf766c2c2ad6fc35d99f97c48853bc10366e12cf1a94fb63fb",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 218.0,
+          "fat_g": 16.7,
+          "saturated_fat_g": 8.7,
+          "carbs_g": 4.5,
+          "sugars_g": 1.5,
+          "fiber_g": 7.9,
+          "protein_g": 8.4,
+          "salt_g": 1.03
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "29094295",
+      "features": []
+    },
+    {
+      "id": "en-18",
+      "language": "en",
+      "split": "development",
+      "barcode": "4009680361926",
+      "image_url": "https://images.openfoodfacts.org/images/products/400/968/036/1926/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "efd7cff3afb4d8285b9ecff413f88fa1480ed978357706ebf01977b2156d0275",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 478.0,
+          "fat_g": 18.0,
+          "saturated_fat_g": 8.0,
+          "carbs_g": 75.0,
+          "sugars_g": 21.0,
+          "fiber_g": 1.9,
+          "protein_g": 2.0,
+          "salt_g": 0.26
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "4009680361926",
+      "features": []
+    },
+    {
+      "id": "en-19",
+      "language": "en",
+      "split": "development",
+      "barcode": "0037466083049",
+      "image_url": "https://images.openfoodfacts.org/images/products/003/746/608/3049/5.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "8542ea24091068aec8ef700b20a17960ac26b5a1c0afd63b2af4cdb3ab604742",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 533.3333333333334,
+          "fat_g": 40.0,
+          "saturated_fat_g": 23.333333333333336,
+          "carbs_g": 43.333333333333336,
+          "sugars_g": 23.333333333333336,
+          "fiber_g": 13.333333333333334,
+          "protein_g": 10.0,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "0037466083049",
+      "features": [
+        "portion-only"
+      ]
+    },
+    {
+      "id": "en-20",
+      "language": "en",
+      "split": "development",
+      "barcode": "5010251903802",
+      "image_url": "https://images.openfoodfacts.org/images/products/501/025/190/3802/3.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "74d7da2c51ab2f9adfeeb2a816c65a58c36fc73430ca56dc602e5d443b2d17ac",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 119.0,
+          "fat_g": 2.2,
+          "saturated_fat_g": 0.4,
+          "carbs_g": 15.4,
+          "sugars_g": 0.5,
+          "fiber_g": 4.9,
+          "protein_g": 6.8,
+          "salt_g": 0.04
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "5010251903802",
+      "features": [
+        "multiple-columns-or-inline-bases",
+        "curvature-glare-or-perspective"
+      ]
+    },
+    {
+      "id": "en-21",
+      "language": "en",
+      "split": "heldout",
+      "barcode": "5999076226825",
+      "image_url": "https://images.openfoodfacts.org/images/products/599/907/622/6825/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "1629a126964632e8186644cb05515dae520ba0d9f2a20c5d8c76bea3c4e98c25",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 505.0,
+          "fat_g": 29.0,
+          "saturated_fat_g": 9.2,
+          "carbs_g": 42.0,
+          "sugars_g": 37.0,
+          "fiber_g": 6.0,
+          "protein_g": 16.0,
+          "salt_g": 0.1
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 180,
+      "difficulty": "hard",
+      "package_group": "5999076226825",
+      "features": [
+        "multiple-columns-or-inline-bases",
+        "rotation"
+      ]
+    },
+    {
+      "id": "en-22",
+      "language": "en",
+      "split": "heldout",
+      "barcode": "8410320338158",
+      "image_url": "https://images.openfoodfacts.org/images/products/841/032/033/8158/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "88d7be048a7ddf715356e09210e70ed739bdbc5a16bcc0de69b571e5eef6f6b7",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 586.0,
+          "fat_g": 42.0,
+          "saturated_fat_g": 29.0,
+          "carbs_g": 3.0,
+          "sugars_g": 0.8,
+          "fiber_g": 1.0,
+          "protein_g": 47.0,
+          "salt_g": 2.0
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "8410320338158",
+      "features": [
+        "curvature-glare-or-perspective"
+      ]
+    },
+    {
+      "id": "en-23",
+      "language": "en",
+      "split": "heldout",
+      "barcode": "0059749971102",
+      "image_url": "https://images.openfoodfacts.org/images/products/005/974/997/1102/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "5947ae79e4f49f37430a60aa734b2e211d766196535b0ea640529be147809c9d",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 550.0,
+          "fat_g": 35.0,
+          "saturated_fat_g": 20.0,
+          "carbs_g": 55.0,
+          "sugars_g": 42.5,
+          "fiber_g": 7.5,
+          "protein_g": 7.5,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "0059749971102",
+      "features": [
+        "portion-only"
+      ]
+    },
+    {
+      "id": "en-24",
+      "language": "en",
+      "split": "heldout",
+      "barcode": "20961749",
+      "image_url": "https://images.openfoodfacts.org/images/products/000/002/096/1749/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "24c33934a981a9917507a27dff62d931ef716c2e55df146d081c3fbd2e4a1a7b",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 157.0,
+          "fat_g": 9.0,
+          "saturated_fat_g": 6.2,
+          "carbs_g": 15.5,
+          "sugars_g": 15.2,
+          "fiber_g": null,
+          "protein_g": 2.2,
+          "salt_g": 0.08
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "20961749",
+      "features": [
+        "inequality",
+        "multiple-columns-or-inline-bases"
+      ]
+    },
+    {
+      "id": "en-25",
+      "language": "en",
+      "split": "heldout",
+      "barcode": "8421029581370",
+      "image_url": "https://images.openfoodfacts.org/images/products/842/102/958/1370/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "5868d9172e91c58dda17947f2457b84f8f5a29f7aa9dd78999cc0a69e68b3e63",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 537.0,
+          "fat_g": 44.42,
+          "saturated_fat_g": 7.9,
+          "carbs_g": 11.0,
+          "sugars_g": 0.0,
+          "fiber_g": null,
+          "protein_g": 24.2,
+          "salt_g": 0.0
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "hard",
+      "package_group": "8421029581370",
+      "features": [
+        "curvature-glare-or-perspective"
+      ]
+    },
+    {
+      "id": "en-26",
+      "language": "en",
+      "split": "heldout",
+      "barcode": "0794711001424",
+      "image_url": "https://images.openfoodfacts.org/images/products/079/471/100/1424/4.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "d8ab27e699a665d478faeb6617201937d56d9042bd467494e0daec08e2125c8f",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 200.0,
+          "fat_g": 1.0,
+          "saturated_fat_g": 0.0,
+          "carbs_g": 34.0,
+          "sugars_g": 10.0,
+          "fiber_g": 6.0,
+          "protein_g": 4.0,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "0794711001424",
+      "features": [
+        "portion-only"
+      ]
+    },
+    {
+      "id": "en-27",
+      "language": "en",
+      "split": "heldout",
+      "barcode": "0056936600005",
+      "image_url": "https://images.openfoodfacts.org/images/products/005/693/660/0005/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "61963d9234339af123a3b0807f8715cbce69e5346408758f8c83bbc72c652874",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 177.77777777777777,
+          "fat_g": 2.2222222222222223,
+          "saturated_fat_g": 0.0,
+          "carbs_g": 34.44444444444444,
+          "sugars_g": 2.2222222222222223,
+          "fiber_g": 1.1111111111111112,
+          "protein_g": 5.555555555555555,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "0056936600005",
+      "features": [
+        "portion-only"
+      ]
+    },
+    {
+      "id": "en-28",
+      "language": "en",
+      "split": "heldout",
+      "barcode": "0058441462970",
+      "image_url": "https://images.openfoodfacts.org/images/products/005/844/146/2970/2.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "8b30b47d67ed21c739779174fa942536ff692aa7c412a93c01548257603e88bf",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 290.0,
+          "fat_g": 5.0,
+          "saturated_fat_g": 2.0,
+          "carbs_g": 43.0,
+          "sugars_g": 1.0,
+          "fiber_g": 3.0,
+          "protein_g": 10.0,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "0058441462970",
+      "features": []
+    },
+    {
+      "id": "en-29",
+      "language": "en",
+      "split": "heldout",
+      "barcode": "5400606994270",
+      "image_url": "https://images.openfoodfacts.org/images/products/540/060/699/4270/4.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "f1636443a4753e5f8f59c1d688d64a44da138451fef6b935839f0b5850e0d779",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "g",
+        "values": {
+          "energy_kcal": 512.0,
+          "fat_g": 27.9,
+          "saturated_fat_g": 2.1,
+          "carbs_g": 50.0,
+          "sugars_g": 47.5,
+          "fiber_g": 7.0,
+          "protein_g": 11.8,
+          "salt_g": null
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "5400606994270",
+      "features": [
+        "inequality",
+        "multiple-columns-or-inline-bases"
+      ]
+    },
+    {
+      "id": "en-30",
+      "language": "en",
+      "split": "heldout",
+      "barcode": "8019730002514",
+      "image_url": "https://images.openfoodfacts.org/images/products/801/973/000/2514/5.jpg",
+      "source": "https://huggingface.co/datasets/openfoodfacts/nutrient-detection-layout",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "Open Food Facts contributors",
+      "sha256": "25b9c3b44ec57641f396c672fbc3c84f60c7a740224b9208c4cf5a8bc31e91ce",
+      "crop": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "expected": {
+        "unit": "ml",
+        "values": {
+          "energy_kcal": 206.0,
+          "fat_g": 20.0,
+          "saturated_fat_g": 14.0,
+          "carbs_g": 3.9,
+          "sugars_g": 3.7,
+          "fiber_g": null,
+          "protein_g": 2.7,
+          "salt_g": 0.08
+        }
+      },
+      "verified": true,
+      "verification": "Printed values visually reviewed; null means absent, inequality, traces, or basis not established",
+      "rotation": 0,
+      "difficulty": "readable",
+      "package_group": "8019730002514",
+      "features": [
+        "volume"
+      ]
+    }
+  ],
+  "ground_truth_note": "Values represent the visible as-sold column normalized to 100 g/ml; bounds, traces and missing salt are never inferred from sodium"
+}

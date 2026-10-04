@@ -20,6 +20,9 @@ pub const PASSWORD: &str = "Squat#Depth1";
 
 pub fn config(registration: Registration) -> Config {
     Config {
+        openai_key: None,
+        openai_endpoint: "https://api.openai.com/v1/responses".into(),
+        ocr_endpoint: None,
         database_url: String::new(),
         db_max_connections: 5,
         bind_addr: ([127, 0, 0, 1], 0).into(),
@@ -47,6 +50,11 @@ impl TestApp {
     /// Open registration, so tests can create users freely
     pub fn new(pool: PgPool) -> Self {
         Self::with_registration_and_photos(pool, Registration::Open, None)
+    }
+
+    pub fn with_config(pool: PgPool, config: Config) -> Self {
+        let router = router(AppState::new(pool.clone(), config));
+        Self { router, pool }
     }
 
     pub fn invite_only(pool: PgPool) -> Self {
@@ -83,7 +91,30 @@ impl TestApp {
         if let Some(content_type) = content_type {
             builder = builder.header(header::CONTENT_TYPE, content_type);
         }
-        let request = builder.body(Body::from(bytes)).expect("valid request");
+        self.send(builder.body(Body::from(bytes)).expect("valid request"))
+            .await
+    }
+
+    /// A request without a body, with extra headers
+    pub async fn raw_with_headers(
+        &self,
+        method: Method,
+        uri: &str,
+        token: Option<&str>,
+        headers: &[(axum::http::HeaderName, &str)],
+    ) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
+        let mut builder = Request::builder().method(method).uri(uri);
+        if let Some(token) = token {
+            builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
+        }
+        for (name, value) in headers {
+            builder = builder.header(name, *value);
+        }
+        self.send(builder.body(Body::empty()).expect("valid request"))
+            .await
+    }
+
+    async fn send(&self, request: Request<Body>) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
         let response = self
             .router
             .clone()

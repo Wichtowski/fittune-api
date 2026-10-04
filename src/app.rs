@@ -11,6 +11,7 @@ use serde_json::json;
 use sqlx::PgPool;
 use tower::ServiceBuilder;
 use tower_http::{
+    compression::CompressionLayer,
     cors::{AllowOrigin, CorsLayer},
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, RequestId, SetRequestIdLayer},
     sensitive_headers::SetSensitiveRequestHeadersLayer,
@@ -46,6 +47,7 @@ const FRIEND_ACTION_WINDOW: Duration = Duration::from_secs(60 * 60);
 
 #[derive(Clone)]
 pub struct AppState {
+    pub ocr: Arc<health::ocr::Runtime>,
     pub db: PgPool,
     pub config: Arc<Config>,
     pub photos: Option<Arc<dyn photos::PhotoStore>>,
@@ -61,6 +63,7 @@ impl AppState {
             Arc::new(photos::S3PhotoStore::new(storage)) as Arc<dyn photos::PhotoStore>
         });
         Self {
+            ocr: Arc::new(health::ocr::Runtime::default()),
             db,
             config: Arc::new(config),
             photos,
@@ -89,6 +92,7 @@ pub fn router(state: AppState) -> Router {
         .nest("/auth", auth::router())
         .merge(users::router())
         .merge(invites::router())
+        .merge(crate::admin::router())
         .merge(friends::router())
         .nest("/train", train::router())
         .nest("/health", health::router())
@@ -110,6 +114,8 @@ pub fn router(state: AppState) -> Router {
                 .on_response(DefaultOnResponse::new().level(Level::INFO)),
         )
         .layer(PropagateRequestIdLayer::new(REQUEST_ID))
+        // The exercise library is over a megabyte of JSON; already compressed images pass through
+        .layer(CompressionLayer::new())
         .layer(cors(&state.config.cors_origins))
         .layer(TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(30)))
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES));
@@ -136,7 +142,7 @@ fn cors(origins: &[String]) -> CorsLayer {
             Method::DELETE,
         ])
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE])
-        .expose_headers([REQUEST_ID])
+        .expose_headers([REQUEST_ID, header::RETRY_AFTER])
         .max_age(Duration::from_secs(60 * 60))
 }
 

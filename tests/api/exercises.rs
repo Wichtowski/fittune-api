@@ -19,7 +19,7 @@ async fn catalog_is_seeded_and_filterable(pool: PgPool) {
 
     let (status, all) = app.get("/api/v1/train/exercises", &user.token).await;
     assert_eq!(status, StatusCode::OK);
-    assert!(all.as_array().map_or(0, Vec::len) >= 40);
+    assert!(all.as_array().map_or(0, Vec::len) >= 1300);
     let bench = all
         .as_array()
         .and_then(|list| list.iter().find(|e| e["name"] == "Barbell Bench Press"))
@@ -34,10 +34,15 @@ async fn catalog_is_seeded_and_filterable(pool: PgPool) {
             &user.token,
         )
         .await;
-    assert_eq!(
-        names(&curls),
-        ["Hammer Curl", "Incline Dumbbell Curl", "Wrist Curl"]
-    );
+    let curl_names = names(&curls);
+    for name in ["Hammer Curl", "Incline Dumbbell Curl", "Wrist Curl"] {
+        assert!(curl_names.contains(&name), "{name}");
+    }
+    for curl in curls.as_array().expect("array") {
+        assert_eq!(curl["equipment"], "dumbbell", "{curl}");
+        let name = curl["name"].as_str().expect("name").to_lowercase();
+        assert!(name.contains("curl"), "{name}");
+    }
 
     let (_, triceps) = app
         .get("/api/v1/train/exercises?muscle=triceps", &user.token)
@@ -68,7 +73,7 @@ async fn custom_exercises_are_private_to_their_owner(pool: PgPool) {
         .post(
             "/api/v1/train/exercises",
             Some(&owner.token),
-            json!({ "name": "Sled Push", "tracking": "distance_duration", "primary_muscle": "quadriceps",
+            json!({ "name": "Prowler Push", "tracking": "distance_duration", "primary_muscle": "quadriceps",
                     "equipment": "other", "secondary_muscles": ["glutes", "calves"] }),
         )
         .await;
@@ -77,11 +82,11 @@ async fn custom_exercises_are_private_to_their_owner(pool: PgPool) {
     let id = created["id"].as_str().expect("id");
 
     let (_, list) = app
-        .get("/api/v1/train/exercises?q=sled", &owner.token)
+        .get("/api/v1/train/exercises?q=prowler", &owner.token)
         .await;
-    assert_eq!(names(&list), ["Sled Push"]);
+    assert_eq!(names(&list), ["Prowler Push"]);
     let (_, list) = app
-        .get("/api/v1/train/exercises?q=sled", &other.token)
+        .get("/api/v1/train/exercises?q=prowler", &other.token)
         .await;
     assert!(names(&list).is_empty());
     assert_eq!(
@@ -95,7 +100,7 @@ async fn custom_exercises_are_private_to_their_owner(pool: PgPool) {
         .post(
             "/api/v1/train/exercises",
             Some(&owner.token),
-            json!({ "name": "sled push", "tracking": "duration", "primary_muscle": "quadriceps" }),
+            json!({ "name": "prowler push", "tracking": "duration", "primary_muscle": "quadriceps" }),
         )
         .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
@@ -113,7 +118,7 @@ async fn owners_can_update_and_archive_custom_exercises(pool: PgPool) {
         .post(
             "/api/v1/train/exercises",
             Some(&user.token),
-            json!({ "name": "Landmine Press", "tracking": "weight_reps", "primary_muscle": "shoulders" }),
+            json!({ "name": "Viking Press", "tracking": "weight_reps", "primary_muscle": "shoulders" }),
         )
         .await;
     let uri = format!(
@@ -125,7 +130,7 @@ async fn owners_can_update_and_archive_custom_exercises(pool: PgPool) {
         .put(
             &uri,
             &user.token,
-            json!({ "name": "Half-Kneeling Landmine Press", "tracking": "weight_reps",
+            json!({ "name": "Half-Kneeling Viking Press", "tracking": "weight_reps",
                     "primary_muscle": "shoulders", "equipment": "barbell", "video_id": "dQw4w9WgXcQ" }),
         )
         .await;
@@ -138,7 +143,7 @@ async fn owners_can_update_and_archive_custom_exercises(pool: PgPool) {
         StatusCode::NO_CONTENT
     );
     let (_, list) = app
-        .get("/api/v1/train/exercises?q=landmine", &user.token)
+        .get("/api/v1/train/exercises?q=viking", &user.token)
         .await;
     assert!(
         names(&list).is_empty(),
@@ -167,7 +172,7 @@ async fn only_admins_manage_the_catalog(pool: PgPool) {
     assert_eq!(app.delete(&uri, &user.token).await.0, StatusCode::FORBIDDEN);
     assert_eq!(app.put(&uri, &admin.token, edit).await.0, StatusCode::OK);
 
-    let global = json!({ "name": "Pendlay Row", "tracking": "weight_reps", "primary_muscle": "upper_back",
+    let global = json!({ "name": "Meadows Row", "tracking": "weight_reps", "primary_muscle": "upper_back",
                          "global": true });
     let (status, _) = app
         .post("/api/v1/train/exercises", Some(&user.token), global.clone())
@@ -180,11 +185,11 @@ async fn only_admins_manage_the_catalog(pool: PgPool) {
     assert_eq!(created["is_custom"], false);
 
     let (_, list) = app
-        .get("/api/v1/train/exercises?q=pendlay", &user.token)
+        .get("/api/v1/train/exercises?q=meadows", &user.token)
         .await;
     assert_eq!(
         names(&list),
-        ["Pendlay Row"],
+        ["Meadows Row"],
         "catalog additions are visible to everyone"
     );
 }

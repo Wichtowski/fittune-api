@@ -85,7 +85,10 @@ pub struct Exercise {
     /// for clients that predate `media`
     #[sqlx(skip)]
     pub video_id: Option<String>,
+    /// English for catalog exercises; whatever the owner wrote for custom ones
     pub instructions: Option<String>,
+    /// Polish translation of a catalog exercise's instructions
+    pub instructions_pl: Option<String>,
     pub is_custom: bool,
     pub archived_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,

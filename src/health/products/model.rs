@@ -20,6 +20,8 @@ pub enum ProductSource {
     Manual,
     /// Confirmed from an Open Food Facts listing
     Off,
+    Ocr,
+    Ai,
 }
 
 /// A food in the shared database

@@ -4,8 +4,11 @@ use anyhow::{Context, Result, bail};
 use axum::http::HeaderName;
 
 /// Runtime configuration, read from `FITTUNE_*` environment variables.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Config {
+    pub openai_key: Option<String>,
+    pub openai_endpoint: String,
+    pub ocr_endpoint: Option<String>,
     pub database_url: String,
     pub db_max_connections: u32,
     pub bind_addr: SocketAddr,
@@ -105,6 +108,13 @@ impl Config {
             .context("FITTUNE_CLIENT_IP_HEADER must be a valid header name")?;
 
         Ok(Self {
+            openai_key: env::var("OPENAI_API_KEY")
+                .ok()
+                .filter(|s| !s.trim().is_empty()),
+            openai_endpoint: "https://api.openai.com/v1/responses".into(),
+            ocr_endpoint: env::var("FITTUNE_OCR_ENDPOINT")
+                .ok()
+                .filter(|s| !s.trim().is_empty()),
             database_url,
             db_max_connections,
             bind_addr,

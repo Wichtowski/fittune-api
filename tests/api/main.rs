@@ -4,6 +4,7 @@
 mod activities;
 mod auth;
 mod barcode;
+mod catalog;
 mod common;
 mod exercise_media;
 mod exercises;
@@ -13,6 +14,7 @@ mod friends;
 mod health;
 mod invites;
 mod namespaces;
+mod ocr;
 mod off_import;
 mod photos;
 mod places;
