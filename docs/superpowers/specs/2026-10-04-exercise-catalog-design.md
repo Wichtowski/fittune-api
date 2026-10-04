@@ -54,7 +54,10 @@ The startup backfill now handles 2,654 files instead of 86:
 - `Exercise` gains `instructions_pl`; `ExerciseMedia` gains kind `animation` and `attribution`.
 - `media` is ordered photos, animations, videos.
 - `GET /train/exercise-media/{id}/file` serves `image/jpeg` or `image/gif`.
-- Responses are gzip-compressed: the library is about 1.5 MB of JSON and the app loads all of it for offline use.
+- `GET /train/exercises` returns `null` for both instruction texts.
+  The app persists the whole library in `localStorage` for offline use, and with the texts it is 2.4 million characters, close to Safari's quota on its own.
+  Without them it is 1.2 million, and the exercise screen already loads its exercise through the history endpoint.
+- Responses are gzip-compressed.
 
 ## Rollout
 
@@ -67,4 +70,5 @@ The startup backfill now handles 2,654 files instead of 86:
 
 - No new muscle groups (adductors, abductors, serratus).
 - No pagination of the library; it stays one compressed response.
+- The app's query cache stays in `localStorage`; moving it to IndexedDB is the next step if the library grows further.
 - The unreferenced Free Exercise DB photos of merged exercises are left in object storage.

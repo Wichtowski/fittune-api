@@ -99,7 +99,7 @@ async fn imported_exercises_are_matched_to_places_by_real_equipment(pool: PgPool
 }
 
 #[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
-async fn exercises_carry_polish_instructions_and_the_library_is_compressed(pool: PgPool) {
+async fn one_exercise_carries_instructions_and_the_library_stays_small(pool: PgPool) {
     let app = TestApp::new(pool);
     let user = app.register("polyglot").await;
     let bench = app.catalog_exercise("Barbell Bench Press").await;
@@ -126,8 +126,23 @@ async fn exercises_carry_polish_instructions_and_the_library_is_compressed(pool:
     assert_eq!(status, StatusCode::OK);
     assert_eq!(headers[header::CONTENT_ENCODING], "gzip");
     assert!(
-        body.len() < 600 * 1024,
+        body.len() < 300 * 1024,
         "the library is {} bytes compressed",
         body.len()
     );
+
+    // Clients keep the whole library offline, so it leaves out the texts only one screen shows
+    let (_, library) = app.get("/api/v1/train/exercises", &user.token).await;
+    let library = library.as_array().expect("array");
+    let listed = library
+        .iter()
+        .find(|exercise| exercise["id"] == bench.as_str())
+        .expect("bench press listed");
+    assert_eq!(listed["instructions"], serde_json::Value::Null);
+    assert_eq!(listed["instructions_pl"], serde_json::Value::Null);
+    let size = serde_json::to_string(library)
+        .expect("json")
+        .chars()
+        .count();
+    assert!(size < 1_300_000, "the library is {size} characters");
 }

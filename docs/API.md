@@ -142,7 +142,7 @@ A shared catalog (seeded, admin-managed) plus each user's private custom exercis
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET    | `/api/v1/train/exercises?q=&muscle=&equipment=` | Active catalog + own exercises, sorted by name. `muscle` matches primary or secondary. |
+| GET    | `/api/v1/train/exercises?q=&muscle=&equipment=` | Active catalog + own exercises, sorted by name. `muscle` matches primary or secondary. `instructions` and `instructions_pl` are always `null` here. |
 | GET    | `/api/v1/train/exercises/{id}` | Also returns archived exercises (history still references them). |
 | POST   | `/api/v1/train/exercises` | `ExerciseInput`; `"global": true` adds to the catalog (admin only). `201` |
 | PUT    | `/api/v1/train/exercises/{id}` | Full replace. Owners edit custom exercises; admins edit the catalog. |
@@ -192,7 +192,9 @@ A photo's or animation's `url` is relative to the API origin and works in a plai
 `attribution` must be shown wherever the file is: the dataset's media are © Gym visual and not covered by the dataset's MIT licence.
 In an `Exercise`, `video_id` is the first YouTube video in `media` (a Vimeo video leaves it `null`); it stays for clients that predate `media`.
 Catalog media are copied from their source into object storage in the background on API start, four at a time, so right after a fresh deploy a file can return `404` for a few minutes.
-Responses are gzip-compressed when the client accepts it; the full library is about 1.5 MB of JSON before compression.
+The list leaves out both instruction texts because clients keep the whole library for offline use and the texts would double its size; read them from `GET /exercises/{id}` or the history.
+A client must therefore load one exercise before sending it back with `PUT`, or it would erase its instructions.
+Responses are gzip-compressed when the client accepts it; the library is about 1.2 MB of JSON before compression.
 
 `equipment` is a display category used for badges and the `equipment=` filter.
 `requires` is what matches exercises to places: an exercise can be done at a place when every item it requires is in the place's `equipment`.
