@@ -81,14 +81,16 @@ async fn seed_account(
 ) -> Result<()> {
     let token = Some(token);
     let profile = (account.profile)();
-    api.expect(Method::PATCH, "/api/v1/me", token, Some(&profile), OK)
+    let (_, me) = api
+        .expect(Method::PATCH, "/api/v1/me", token, Some(&profile), OK)
         .await?;
+    let user_id = text(&me, "/id")?;
 
     let custom_exercises = plan::custom_exercises(account.kind);
     if !custom_exercises.is_empty() {
-        save_custom_exercises(api, token, custom_exercises).await?;
+        save_custom_exercises(api, token, &user_id, custom_exercises).await?;
     }
-    let exercises = exercise_ids(api, token).await?;
+    let exercises = exercise_ids(api, token, &user_id).await?;
     let places = save_places(api, account, token).await?;
     let routines = save_routines(api, account, token, &exercises).await?;
     summary.routines += routines.len();
@@ -351,17 +353,28 @@ fn by_name(items: &[Value], keep: impl Fn(&Value) -> bool) -> Result<HashMap<Str
         .collect()
 }
 
-/// The catalog and the account's custom exercises.
-async fn exercise_ids(api: &Api, token: Option<&str>) -> Result<HashMap<String, String>> {
-    by_name(&list(api, token, "/api/v1/train/exercises").await?, |_| {
-        true
+/// The catalog and the account's own exercises. Everyone sees what other users created too,
+/// and names are only unique per owner, so those are left out: a plan must never pick up
+/// another account's exercise of the same name.
+async fn exercise_ids(
+    api: &Api,
+    token: Option<&str>,
+    user_id: &str,
+) -> Result<HashMap<String, String>> {
+    by_name(&list(api, token, "/api/v1/train/exercises").await?, |e| {
+        e["owner_id"].is_null() || e["owner_id"] == user_id
     })
 }
 
 /// Custom exercise ids come from the server, so an existing one with the same name is updated.
-async fn save_custom_exercises(api: &Api, token: Option<&str>, bodies: Vec<Value>) -> Result<()> {
+async fn save_custom_exercises(
+    api: &Api,
+    token: Option<&str>,
+    user_id: &str,
+    bodies: Vec<Value>,
+) -> Result<()> {
     let existing = by_name(&list(api, token, "/api/v1/train/exercises").await?, |e| {
-        e["is_custom"] == Value::Bool(true)
+        e["owner_id"] == user_id
     })?;
     for body in bodies {
         match existing.get(&text(&body, "/name")?.to_lowercase()) {

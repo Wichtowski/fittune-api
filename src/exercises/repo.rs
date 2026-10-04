@@ -16,7 +16,8 @@ macro_rules! exercise_columns {
         concat!(
             "id, owner_id, name, tracking, primary_muscle, secondary_muscles, equipment, requires, difficulty, ",
             $instructions,
-            ", owner_id IS NOT NULL AS is_custom, archived_at, created_at, updated_at"
+            ", owner_id IS NOT NULL AS is_custom, archived_at, created_at, updated_at, \
+             (SELECT COALESCE(NULLIF(btrim(u.display_name), ''), u.username) FROM users u WHERE u.id = owner_id) AS created_by"
         )
     };
 }
@@ -28,26 +29,20 @@ pub struct ExerciseFilter {
     pub equipment: Option<Equipment>,
 }
 
-/// Active exercises visible to `user_id`: the shared catalog plus the user's own. Instruction
+/// Every active exercise: the catalog and what users created, which everyone can use. Instruction
 /// texts are left out: they are most of the library's size, clients keep the whole list for
 /// offline use, and only the screen of one exercise shows them.
-pub async fn list(
-    db: &PgPool,
-    user_id: Uuid,
-    filter: &ExerciseFilter,
-) -> sqlx::Result<Vec<Exercise>> {
+pub async fn list(db: &PgPool, filter: &ExerciseFilter) -> sqlx::Result<Vec<Exercise>> {
     let mut exercises: Vec<Exercise> = sqlx::query_as(concat!(
         "SELECT ",
         exercise_columns!("NULL::text AS instructions, NULL::text AS instructions_pl"),
         " FROM exercises
-          WHERE (owner_id IS NULL OR owner_id = $1)
-            AND archived_at IS NULL
-            AND ($2::text IS NULL OR name ILIKE '%' || $2 || '%')
-            AND ($3::text IS NULL OR primary_muscle = $3 OR $3 = ANY (secondary_muscles))
-            AND ($4::text IS NULL OR equipment = $4)
-          ORDER BY lower(name)"
+          WHERE archived_at IS NULL
+            AND ($1::text IS NULL OR name ILIKE '%' || $1 || '%')
+            AND ($2::text IS NULL OR primary_muscle = $2 OR $2 = ANY (secondary_muscles))
+            AND ($3::text IS NULL OR equipment = $3)
+          ORDER BY lower(name), owner_id NULLS FIRST, id"
     ))
-    .bind(user_id)
     .bind(filter.search.as_deref().map(escape_like))
     .bind(filter.muscle)
     .bind(filter.equipment)
@@ -57,25 +52,23 @@ pub async fn list(
     Ok(exercises)
 }
 
-/// Any exercise visible to `user_id`, including archived ones (history still references them).
-pub async fn find_visible(db: &PgPool, user_id: Uuid, id: Uuid) -> sqlx::Result<Option<Exercise>> {
+/// Any exercise, including archived ones (history still references them).
+pub async fn find(db: &PgPool, id: Uuid) -> sqlx::Result<Option<Exercise>> {
     let mut exercise: Option<Exercise> = sqlx::query_as(concat!(
         "SELECT ",
         exercise_columns!(),
-        " FROM exercises WHERE id = $1 AND (owner_id IS NULL OR owner_id = $2)"
+        " FROM exercises WHERE id = $1"
     ))
     .bind(id)
-    .bind(user_id)
     .fetch_optional(db)
     .await?;
     media::attach(db, exercise.as_mut_slice()).await?;
     Ok(exercise)
 }
 
-/// Whether every id in `ids` refers to an exercise visible to `user_id` (archived ones included).
-pub async fn all_visible(
+/// Whether every id in `ids` refers to an exercise (archived ones included).
+pub async fn all_exist(
     db: impl PgExecutor<'_>,
-    user_id: Uuid,
     ids: impl IntoIterator<Item = Uuid>,
 ) -> sqlx::Result<bool> {
     let mut ids: Vec<Uuid> = ids.into_iter().collect();
@@ -84,14 +77,11 @@ pub async fn all_visible(
     if ids.is_empty() {
         return Ok(true);
     }
-    let visible: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM exercises WHERE id = ANY ($1) AND (owner_id IS NULL OR owner_id = $2)",
-    )
-    .bind(&ids)
-    .bind(user_id)
-    .fetch_one(db)
-    .await?;
-    Ok(usize::try_from(visible).ok() == Some(ids.len()))
+    let existing: i64 = sqlx::query_scalar("SELECT count(*) FROM exercises WHERE id = ANY ($1)")
+        .bind(&ids)
+        .fetch_one(db)
+        .await?;
+    Ok(usize::try_from(existing).ok() == Some(ids.len()))
 }
 
 /// Media are written on the same connection, so pass a transaction.

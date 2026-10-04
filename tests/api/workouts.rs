@@ -135,7 +135,7 @@ async fn workouts_are_isolated_between_users(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
-async fn workouts_cannot_reference_other_users_exercises(pool: PgPool) {
+async fn workouts_can_use_exercises_other_users_created(pool: PgPool) {
     let app = TestApp::new(pool);
     let owner = app.register("owner").await;
     let other = app.register("other").await;
@@ -143,7 +143,7 @@ async fn workouts_cannot_reference_other_users_exercises(pool: PgPool) {
         .post(
             "/api/v1/train/exercises",
             Some(&owner.token),
-            json!({ "name": "Secret Lift", "tracking": "weight_reps", "primary_muscle": "chest" }),
+            json!({ "name": "Shared Lift", "tracking": "weight_reps", "primary_muscle": "chest" }),
         )
         .await;
     let custom_id = custom["id"].as_str().expect("id");
@@ -154,6 +154,16 @@ async fn workouts_cannot_reference_other_users_exercises(pool: PgPool) {
             &uri,
             &other.token,
             workout(custom_id, "2026-09-20T17:00:00Z", None, 1),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    assert_eq!(body["exercises"][0]["exercise_name"], "Shared Lift");
+
+    let (status, body) = app
+        .put(
+            &format!("/api/v1/train/workouts/{}", uuid()),
+            &other.token,
+            workout(&uuid(), "2026-09-21T17:00:00Z", None, 1),
         )
         .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);

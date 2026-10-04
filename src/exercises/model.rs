@@ -71,8 +71,10 @@ pub enum Difficulty {
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct Exercise {
     pub id: Uuid,
-    #[serde(skip)]
+    /// The user who created the exercise; `None` for the catalog
     pub owner_id: Option<Uuid>,
+    /// Display name of the owner, shown to everyone since created exercises are shared
+    pub created_by: Option<String>,
     pub name: String,
     pub tracking: Tracking,
     pub primary_muscle: Muscle,

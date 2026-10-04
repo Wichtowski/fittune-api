@@ -64,7 +64,7 @@ async fn catalog_is_seeded_and_filterable(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
-async fn custom_exercises_are_private_to_their_owner(pool: PgPool) {
+async fn created_exercises_are_shared_and_credited(pool: PgPool) {
     let app = TestApp::new(pool);
     let owner = app.register("owner").await;
     let other = app.register("other").await;
@@ -85,16 +85,72 @@ async fn custom_exercises_are_private_to_their_owner(pool: PgPool) {
         .get("/api/v1/train/exercises?q=prowler", &owner.token)
         .await;
     assert_eq!(names(&list), ["Prowler Push"]);
+    assert_eq!(created["owner_id"], owner.id.as_str());
+    assert_eq!(
+        created["created_by"], "owner",
+        "the username until a display name is set"
+    );
+
+    // Everyone can find and use it, and sees who made it
+    app.request(
+        axum::http::Method::PATCH,
+        "/api/v1/me",
+        Some(&owner.token),
+        Some(json!({ "display_name": "Olga Owner" })),
+    )
+    .await;
     let (_, list) = app
         .get("/api/v1/train/exercises?q=prowler", &other.token)
         .await;
-    assert!(names(&list).is_empty());
+    assert_eq!(names(&list), ["Prowler Push"]);
+    assert_eq!(list[0]["created_by"], "Olga Owner");
+    assert_eq!(list[0]["owner_id"], owner.id.as_str());
+    let uri = format!("/api/v1/train/exercises/{id}");
+    let (status, seen) = app.get(&uri, &other.token).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(seen["is_custom"], true);
+
+    // But only its owner or an admin changes it
+    let edit =
+        json!({ "name": "Prowler Push", "tracking": "reps", "primary_muscle": "quadriceps" });
     assert_eq!(
-        app.get(&format!("/api/v1/train/exercises/{id}"), &other.token)
-            .await
-            .0,
-        StatusCode::NOT_FOUND
+        app.put(&uri, &other.token, edit.clone()).await.0,
+        StatusCode::FORBIDDEN
     );
+    assert_eq!(
+        app.delete(&uri, &other.token).await.0,
+        StatusCode::FORBIDDEN
+    );
+    let admin = app.register("moderator").await;
+    app.make_admin(&admin).await;
+    let (status, moderated) = app.put(&uri, &admin.token, edit).await;
+    assert_eq!(status, StatusCode::OK, "{moderated}");
+    assert_eq!(moderated["tracking"], "reps");
+    assert_eq!(
+        moderated["owner_id"],
+        owner.id.as_str(),
+        "an admin's edit does not take the exercise over"
+    );
+
+    // Names are unique per owner, so someone else can have their own of the same name
+    let (status, twin) = app
+        .post(
+            "/api/v1/train/exercises",
+            Some(&other.token),
+            json!({ "name": "Prowler Push", "tracking": "duration", "primary_muscle": "quadriceps" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{twin}");
+    let (_, list) = app
+        .get("/api/v1/train/exercises?q=prowler", &other.token)
+        .await;
+    assert_eq!(list.as_array().map(Vec::len), Some(2));
+    let bench = app.catalog_exercise("Barbell Bench Press").await;
+    let (_, catalog) = app
+        .get(&format!("/api/v1/train/exercises/{bench}"), &other.token)
+        .await;
+    assert_eq!(catalog["owner_id"], serde_json::Value::Null);
+    assert_eq!(catalog["created_by"], serde_json::Value::Null);
 
     let (status, body) = app
         .post(

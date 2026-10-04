@@ -138,15 +138,15 @@ User {
 
 ## Exercises
 
-A shared catalog (seeded, admin-managed) plus each user's private custom exercises.
+A shared catalog (seeded, admin-managed) plus the exercises users create, which everyone can see and use.
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET    | `/api/v1/train/exercises?q=&muscle=&equipment=` | Active catalog + own exercises, sorted by name. `muscle` matches primary or secondary. `instructions` and `instructions_pl` are always `null` here. |
+| GET    | `/api/v1/train/exercises?q=&muscle=&equipment=` | Every active exercise: the catalog and what users created, sorted by name. `muscle` matches primary or secondary. `instructions` and `instructions_pl` are always `null` here. |
 | GET    | `/api/v1/train/exercises/{id}` | Also returns archived exercises (history still references them). |
 | POST   | `/api/v1/train/exercises` | `ExerciseInput`; `"global": true` adds to the catalog (admin only). `201` |
-| PUT    | `/api/v1/train/exercises/{id}` | Full replace. Owners edit custom exercises; admins edit the catalog. |
-| DELETE | `/api/v1/train/exercises/{id}` | Archives (hides from the library, keeps history). `204` |
+| PUT    | `/api/v1/train/exercises/{id}` | Full replace. Owners edit the exercises they created; admins edit the catalog and anyone's exercise. `403` otherwise. |
+| DELETE | `/api/v1/train/exercises/{id}` | Archives (hides from the library, keeps history). Same permissions as `PUT`. `204` |
 | GET    | `/api/v1/train/exercises/{id}/history?sessions=30` | Per-session breakdown and all-time records. |
 | GET    | `/api/v1/train/exercise-media/{id}/file` | Catalog photo as JPEG or animation as GIF. **No auth**, `Cache-Control: public, max-age=31536000, immutable`. `404` for videos, custom exercises' media and files not stored yet. |
 
@@ -174,11 +174,15 @@ EquipmentItem = "barbell" | "ez_bar" | "trap_bar" | "dumbbells" | "kettlebells" 
               | "sledgehammer_tire"
 Muscle = "chest" | "lats" | "upper_back" | "lower_back" | "traps" | "shoulders" | "biceps" | "triceps"
        | "forearms" | "abs" | "quadriceps" | "hamstrings" | "glutes" | "calves" | "full_body" | "cardio"
-Exercise = ExerciseInput + { id, instructions_pl, is_custom, archived_at, created_at, updated_at, media: [ExerciseMedia] }
+Exercise = ExerciseInput + { id, owner_id, created_by, instructions_pl, is_custom, archived_at, created_at, updated_at, media: [ExerciseMedia] }
 ExerciseMedia = { "id", "kind": "photo" | "animation", "provider": "fittune", "position": 0,
                   "url": "/api/v1/train/exercise-media/{id}/file", "attribution": "© Gym visual - https://gymvisual.com/" }
               | { "id", "kind": "video", "provider": "youtube" | "vimeo", "position": 0, "external_id": "hWbUlkb5Ms4" }
 ```
+
+`owner_id` is the user who created the exercise and `created_by` their display name (their username until they set one); both are `null` for the catalog, and `is_custom` says whether there is an owner.
+Names are unique per owner, so two users can each have an exercise of the same name; show `created_by` to tell them apart.
+When an account is deleted, its exercises that other people's workouts or routines still use are handed to the catalog (archived if the catalog already has that name) and the rest are deleted.
 
 `strength_machines` and `cardio_machines` stand for any machine without an item of its own, such as a hack squat or an elliptical.
 

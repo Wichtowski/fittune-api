@@ -69,7 +69,7 @@ async fn put(
     let draft = request.validate(Utc::now())?;
 
     let exercise_ids = draft.exercises.iter().map(|e| e.exercise_id);
-    if !exercises::repo::all_visible(&state.db, auth.user_id(), exercise_ids).await? {
+    if !exercises::repo::all_exist(&state.db, exercise_ids).await? {
         return Err(ApiError::validation(
             "exercises",
             "Workout references an unknown exercise",

@@ -30,7 +30,7 @@ struct ListQuery {
 
 async fn list(
     State(state): State<AppState>,
-    auth: Auth,
+    _auth: Auth,
     Query(query): Query<ListQuery>,
 ) -> ApiResult<axum::Json<Vec<Exercise>>> {
     let filter = ExerciseFilter {
@@ -41,17 +41,15 @@ async fn list(
         muscle: query.muscle,
         equipment: query.equipment,
     };
-    Ok(axum::Json(
-        repo::list(&state.db, auth.user_id(), &filter).await?,
-    ))
+    Ok(axum::Json(repo::list(&state.db, &filter).await?))
 }
 
 async fn show(
     State(state): State<AppState>,
-    auth: Auth,
+    _auth: Auth,
     Path(id): Path<Uuid>,
 ) -> ApiResult<axum::Json<Exercise>> {
-    Ok(axum::Json(visible(&state, &auth, id).await?))
+    Ok(axum::Json(find(&state, id).await?))
 }
 
 async fn create(
@@ -117,7 +115,7 @@ async fn show_history(
     Path(id): Path<Uuid>,
     Query(query): Query<HistoryQuery>,
 ) -> ApiResult<axum::Json<ExerciseHistory>> {
-    let exercise = visible(&state, &auth, id).await?;
+    let exercise = find(&state, id).await?;
     let rows = repo::history_sets(&state.db, auth.user_id(), id).await?;
     let mut sessions = history::build_sessions(rows);
     let records = history::compute_records(&sessions);
@@ -129,16 +127,17 @@ async fn show_history(
     }))
 }
 
-async fn visible(state: &AppState, auth: &Auth, id: Uuid) -> ApiResult<Exercise> {
-    repo::find_visible(&state.db, auth.user_id(), id)
+async fn find(state: &AppState, id: Uuid) -> ApiResult<Exercise> {
+    repo::find(&state.db, id)
         .await?
         .ok_or(ApiError::NotFound("exercise"))
 }
 
-/// Custom exercises can be edited by their owner, catalog exercises only by admins.
+/// Everyone sees every exercise, but only its owner changes one a user created. Admins change
+/// the catalog and moderate what users created.
 async fn editable(state: &AppState, auth: &Auth, id: Uuid) -> ApiResult<Exercise> {
-    let exercise = visible(state, auth, id).await?;
-    if exercise.owner_id.is_none() {
+    let exercise = find(state, id).await?;
+    if exercise.owner_id != Some(auth.user_id()) {
         auth.require_admin()?;
     }
     Ok(exercise)

@@ -1,5 +1,5 @@
 use axum::http::{Method, StatusCode};
-use serde_json::json;
+use serde_json::{Value, json};
 use sqlx::PgPool;
 
 use crate::common::{PASSWORD, TestApp, uuid};
@@ -336,6 +336,83 @@ async fn account_deletion_removes_custom_exercises_in_use(pool: PgPool) {
         )
         .await;
     assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+}
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn account_deletion_keeps_exercises_other_people_use(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let creator = app.register("creator").await;
+    let lifter = app.register("lifter").await;
+    let mut ids = Vec::new();
+    // One the catalog has no name for, one it already has, and one nobody else used
+    for name in ["Zercher Carry", "barbell bench press", "Unused Lift"] {
+        let (status, exercise) = app
+            .post(
+                "/api/v1/train/exercises",
+                Some(&creator.token),
+                json!({ "name": name, "tracking": "weight_reps", "primary_muscle": "quadriceps" }),
+            )
+            .await;
+        assert_eq!(status, StatusCode::CREATED, "{exercise}");
+        ids.push(exercise["id"].as_str().expect("exercise id").to_owned());
+    }
+    let workout_uri = format!("/api/v1/train/workouts/{}", uuid());
+    let (status, body) = app
+        .put(
+            &workout_uri,
+            &lifter.token,
+            json!({
+                "title": "Borrowed",
+                "started_at": "2026-09-01T10:00:00Z",
+                "ended_at": "2026-09-01T11:00:00Z",
+                "revision": 1,
+                "exercises": [{ "id": uuid(), "exercise_id": ids[0], "sets": [] }]
+            }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    let (status, body) = app
+        .post(
+            "/api/v1/train/routines",
+            Some(&lifter.token),
+            json!({ "name": "Borrowed", "exercises": [{ "exercise_id": ids[1] }] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+
+    let (status, body) = app
+        .request(
+            Method::DELETE,
+            "/api/v1/me",
+            Some(&creator.token),
+            Some(json!({ "password": PASSWORD })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+
+    let (status, workout) = app.get(&workout_uri, &lifter.token).await;
+    assert_eq!(status, StatusCode::OK, "the lifter's workout is intact");
+    assert_eq!(workout["exercises"][0]["exercise_name"], "Zercher Carry");
+
+    let exercise = |id: &str| {
+        let uri = format!("/api/v1/train/exercises/{id}");
+        let (app, token) = (&app, lifter.token.clone());
+        async move { app.get(&uri, &token).await }
+    };
+    let (status, carried) = exercise(&ids[0]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(carried["is_custom"], false, "handed to the catalog");
+    assert_eq!(carried["created_by"], Value::Null);
+    assert_eq!(carried["archived_at"], Value::Null);
+
+    let (status, clashing) = exercise(&ids[1]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        clashing["archived_at"].is_string(),
+        "the catalog already has a bench press, so this one only stays for the routine"
+    );
+
+    assert_eq!(exercise(&ids[2]).await.0, StatusCode::NOT_FOUND);
 }
 
 #[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
