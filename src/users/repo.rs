@@ -80,7 +80,8 @@ pub async fn set_role(db: &PgPool, login: &str, role: Role) -> sqlx::Result<Opti
 /// Others can use an exercise a user created, so one that other people's workouts or routines
 /// still reference cannot go with the account. It loses its owner and is archived: those
 /// people keep it in their history, but nothing a user wrote becomes part of the library the
-/// admins curate just because its author left
+/// admins curate just because its author left. `shared` is left as it is, so a private exercise
+/// (which only an admin can have used) does not become visible to everyone by losing its owner
 pub async fn delete(db: &PgPool, id: Uuid) -> sqlx::Result<()> {
     let mut tx = db.begin().await?;
     for statement in [

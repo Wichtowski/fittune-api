@@ -29,11 +29,13 @@ pub struct Viewer {
     pub admin: bool,
 }
 
-/// The catalog, what users created and shared, the viewer's own, and for admins everything.
+/// Everything shared (the catalog and what users created since exercises are shared), the
+/// viewer's own, and for admins everything. Deliberately not "has no owner": a private
+/// exercise that outlives its owner's account has none either and must stay private.
 /// Binds the viewer's id as `$1` and whether they are an admin as `$2`
 macro_rules! visible {
     () => {
-        "(owner_id IS NULL OR shared OR owner_id = $1 OR $2)"
+        "(shared OR owner_id = $1 OR $2)"
     };
 }
 

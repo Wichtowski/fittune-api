@@ -227,6 +227,31 @@ async fn exercises_created_as_private_stay_private(pool: PgPool) {
         ["Rehab Drill"]
     );
     assert_eq!(app.get(&uri, &admin.token).await.0, StatusCode::OK);
+
+    // An admin used it, so it outlives its owner's account. Without an owner it must not
+    // start counting as a catalog exercise that everyone sees
+    let (status, body) = app
+        .post(
+            "/api/v1/train/routines",
+            Some(&admin.token),
+            json!({ "name": "Moderated", "exercises": [{ "exercise_id": id }] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    let (status, body) = app
+        .request(
+            axum::http::Method::DELETE,
+            "/api/v1/me",
+            Some(&owner.token),
+            Some(json!({ "password": crate::common::PASSWORD })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+    assert_eq!(app.get(&uri, &other.token).await.0, StatusCode::NOT_FOUND);
+    assert!(names(&app.get(search, &other.token).await.1).is_empty());
+    let (status, kept) = app.get(&uri, &admin.token).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(kept["archived_at"].is_string());
 }
 
 #[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
