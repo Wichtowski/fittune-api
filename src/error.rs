@@ -35,6 +35,10 @@ pub enum ApiError {
     PayloadTooLarge,
     #[error("too many attempts, try again later")]
     RateLimited,
+    #[error("OCR attempt limit reached; try again in {0} seconds")]
+    OcrRateLimited(u64),
+    #[error("{0}")]
+    OcrUnavailable(String),
     #[error("database error")]
     Database(#[from] sqlx::Error),
     #[error("internal error")]
@@ -70,6 +74,8 @@ impl ApiError {
             Self::StorageUnavailable => (StatusCode::SERVICE_UNAVAILABLE, "storage_unavailable"),
             Self::PayloadTooLarge => (StatusCode::PAYLOAD_TOO_LARGE, "payload_too_large"),
             Self::RateLimited => (StatusCode::TOO_MANY_REQUESTS, "rate_limited"),
+            Self::OcrRateLimited(_) => (StatusCode::TOO_MANY_REQUESTS, "rate_limited"),
+            Self::OcrUnavailable(_) => (StatusCode::SERVICE_UNAVAILABLE, "ocr_unavailable"),
             Self::Database(_) | Self::Internal(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "internal_error")
             }
@@ -95,7 +101,20 @@ impl IntoResponse for ApiError {
             message: self.to_string(),
             fields,
         };
-        (status, Json(body)).into_response()
+        let mut response = (status, Json(body)).into_response();
+        let retry = match self {
+            Self::OcrRateLimited(seconds) => Some(seconds),
+            Self::OcrUnavailable(_) => Some(5),
+            _ => None,
+        };
+        if let Some(seconds) = retry
+            && let Ok(value) = seconds.to_string().parse()
+        {
+            response
+                .headers_mut()
+                .insert(axum::http::header::RETRY_AFTER, value);
+        }
+        response
     }
 }
 

@@ -1,0 +1,104 @@
+{
+  "scoring": {
+    "rounding": "ceiling",
+    "decimal_places": 1,
+    "absolute_tolerance": 0.6,
+    "require_same_basis": true
+  },
+  "fixture_count": 60,
+  "printed_numeric_values": 420,
+  "engines": {
+    "rapid": {
+      "previous_soft_scored": {
+        "correct": 188,
+        "total": 420,
+        "proposed": 219,
+        "wrong": 31
+      },
+      "latest": {
+        "correct": 188,
+        "total": 420,
+        "proposed": 219,
+        "wrong": 31,
+        "failed": 0
+      },
+      "by_language": {
+        "pl": {
+          "failed": 0,
+          "correct": 99,
+          "total": 219,
+          "proposed": 118,
+          "wrong": 19,
+          "p95_seconds": 2.1741737720149104
+        },
+        "en": {
+          "failed": 0,
+          "correct": 89,
+          "total": 201,
+          "proposed": 101,
+          "wrong": 12,
+          "p95_seconds": 1.6235380260040984
+        }
+      },
+      "corrections": [],
+      "correct_coverage_percent": 44.8,
+      "proposal_precision_percent": 85.8
+    },
+    "tesseract": {
+      "previous_soft_scored": {
+        "correct": 35,
+        "total": 420,
+        "proposed": 67,
+        "wrong": 32
+      },
+      "latest": {
+        "correct": 35,
+        "total": 420,
+        "proposed": 67,
+        "wrong": 32,
+        "failed": 0
+      },
+      "by_language": {
+        "pl": {
+          "failed": 0,
+          "correct": 13,
+          "total": 219,
+          "proposed": 33,
+          "wrong": 20,
+          "p95_seconds": 2.7996776370000007
+        },
+        "en": {
+          "failed": 0,
+          "correct": 22,
+          "total": 201,
+          "proposed": 34,
+          "wrong": 12,
+          "p95_seconds": 1.706271012000012
+        }
+      },
+      "corrections": [],
+      "correct_coverage_percent": 8.3,
+      "proposal_precision_percent": 52.2
+    }
+  },
+  "notes": [
+    "Original photo checksums verified for all 60 fixtures",
+    "Both OCR engines rerun on all original crops; final parser replay uses those new observations",
+    "Archived output rescored with the same soft rule to isolate scoring changes",
+    "The first rerun proposed an incorrect decimal repair for 14g read as 149; final mass-unit guard rejects it",
+    "No decimal corrections applied to this corpus after the guard; missing or uncertain kcal/macros prevent reliable repair",
+    "Timings measured on a desktop while other checks were running, not a phone or production VPS"
+  ],
+  "checks": {
+    "rust_full_tests_passed": 190,
+    "frontend_tests_passed": 198,
+    "final_ocr_unit_tests_passed": 8,
+    "final_ocr_api_tests_passed": 5,
+    "python_soft_scoring_test": "passed",
+    "python_watchdog_test": "passed",
+    "clippy": "passed",
+    "frontend_lint": "passed",
+    "frontend_typecheck": "passed",
+    "frontend_build": "passed"
+  }
+}

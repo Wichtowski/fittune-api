@@ -236,10 +236,14 @@ async fn places_accept_every_equipment_item(pool: PgPool) {
     let all = json!([
         "barbell",
         "ez_bar",
+        "trap_bar",
         "dumbbells",
         "kettlebells",
+        "weight_plates",
         "flat_bench",
         "adjustable_bench",
+        "preacher_bench",
+        "back_extension_bench",
         "squat_rack",
         "pull_up_bar",
         "dip_station",
@@ -252,15 +256,26 @@ async fn places_accept_every_equipment_item(pool: PgPool) {
         "pec_deck",
         "shoulder_press_machine",
         "assisted_pull_up_machine",
+        "strength_machines",
         "cable_station",
         "lat_pulldown",
         "seated_row",
         "treadmill",
         "rowing_machine",
         "stationary_bike",
+        "cardio_machines",
         "resistance_band",
+        "suspension_trainer",
+        "stability_ball",
+        "bosu_ball",
+        "medicine_ball",
+        "foam_roller",
+        "plyo_box",
         "ab_wheel",
-        "jump_rope"
+        "jump_rope",
+        "battle_ropes",
+        "climbing_rope",
+        "sledgehammer_tire"
     ]);
     let (status, place) = app
         .put(

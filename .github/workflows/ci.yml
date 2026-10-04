@@ -41,6 +41,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Check OCR watchdog
+        run: python3 -m unittest discover -s ocr-service -p "test_*.py"
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:

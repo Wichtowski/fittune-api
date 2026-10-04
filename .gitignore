@@ -3,3 +3,6 @@
 .env.*
 !.env.example
 *.tar.gz
+
+__pycache__/
+scripts/catalog/.cache/

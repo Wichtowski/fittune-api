@@ -1,6 +1,7 @@
 //! FitTune API: training (FitTune) and nutrition (FitHealth) behind one account.
 
 pub mod activities;
+pub mod admin;
 pub mod app;
 pub mod auth;
 pub mod config;

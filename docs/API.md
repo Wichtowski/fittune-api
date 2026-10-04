@@ -142,13 +142,13 @@ A shared catalog (seeded, admin-managed) plus each user's private custom exercis
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET    | `/api/v1/train/exercises?q=&muscle=&equipment=` | Active catalog + own exercises, sorted by name. `muscle` matches primary or secondary. |
+| GET    | `/api/v1/train/exercises?q=&muscle=&equipment=` | Active catalog + own exercises, sorted by name. `muscle` matches primary or secondary. `instructions` and `instructions_pl` are always `null` here. |
 | GET    | `/api/v1/train/exercises/{id}` | Also returns archived exercises (history still references them). |
 | POST   | `/api/v1/train/exercises` | `ExerciseInput`; `"global": true` adds to the catalog (admin only). `201` |
 | PUT    | `/api/v1/train/exercises/{id}` | Full replace. Owners edit custom exercises; admins edit the catalog. |
 | DELETE | `/api/v1/train/exercises/{id}` | Archives (hides from the library, keeps history). `204` |
 | GET    | `/api/v1/train/exercises/{id}/history?sessions=30` | Per-session breakdown and all-time records. |
-| GET    | `/api/v1/train/exercise-media/{id}/file` | Catalog photo as JPEG. **No auth**, `Cache-Control: public, max-age=31536000, immutable`. `404` for videos, custom exercises' media and photos not stored yet. |
+| GET    | `/api/v1/train/exercise-media/{id}/file` | Catalog photo as JPEG or animation as GIF. **No auth**, `Cache-Control: public, max-age=31536000, immutable`. `404` for videos, custom exercises' media and files not stored yet. |
 
 ```json
 ExerciseInput {
@@ -161,24 +161,40 @@ ExerciseInput {
   "video_id": "dQw4w9WgXcQ" | null,           // YouTube id; stored as the exercise's first video
   "instructions": "…" | null
 }
-EquipmentItem = "barbell" | "ez_bar" | "dumbbells" | "kettlebells"
-              | "flat_bench" | "adjustable_bench" | "squat_rack" | "pull_up_bar" | "dip_station"
+EquipmentItem = "barbell" | "ez_bar" | "trap_bar" | "dumbbells" | "kettlebells" | "weight_plates"
+              | "flat_bench" | "adjustable_bench" | "preacher_bench" | "back_extension_bench"
+              | "squat_rack" | "pull_up_bar" | "dip_station"
               | "leg_press" | "leg_extension" | "leg_curl" | "calf_raise_machine" | "smith_machine"
               | "chest_press_machine" | "pec_deck" | "shoulder_press_machine" | "assisted_pull_up_machine"
+              | "strength_machines"
               | "cable_station" | "lat_pulldown" | "seated_row"
-              | "treadmill" | "rowing_machine" | "stationary_bike"
-              | "resistance_band" | "ab_wheel" | "jump_rope"
+              | "treadmill" | "rowing_machine" | "stationary_bike" | "cardio_machines"
+              | "resistance_band" | "suspension_trainer" | "stability_ball" | "bosu_ball" | "medicine_ball"
+              | "foam_roller" | "plyo_box" | "ab_wheel" | "jump_rope" | "battle_ropes" | "climbing_rope"
+              | "sledgehammer_tire"
 Muscle = "chest" | "lats" | "upper_back" | "lower_back" | "traps" | "shoulders" | "biceps" | "triceps"
        | "forearms" | "abs" | "quadriceps" | "hamstrings" | "glutes" | "calves" | "full_body" | "cardio"
-Exercise = ExerciseInput + { id, is_custom, archived_at, created_at, updated_at, media: [ExerciseMedia] }
-ExerciseMedia = { "id", "kind": "photo", "provider": "fittune", "position": 0, "url": "/api/v1/train/exercise-media/{id}/file" }
+Exercise = ExerciseInput + { id, instructions_pl, is_custom, archived_at, created_at, updated_at, media: [ExerciseMedia] }
+ExerciseMedia = { "id", "kind": "photo" | "animation", "provider": "fittune", "position": 0,
+                  "url": "/api/v1/train/exercise-media/{id}/file", "attribution": "© Gym visual - https://gymvisual.com/" }
               | { "id", "kind": "video", "provider": "youtube" | "vimeo", "position": 0, "external_id": "hWbUlkb5Ms4" }
 ```
 
-`media` lists photos, then videos, each by `position`; catalog photos are the start (`0`) and finish (`1`) frames.
-A photo's `url` is relative to the API origin and works in a plain `<img src>`.
+`strength_machines` and `cardio_machines` stand for any machine without an item of its own, such as a hack squat or an elliptical.
+
+The catalog is the 1,324 exercises of [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) merged into the 47 exercises FitTune started with.
+`instructions` of a catalog exercise is English with one step per line, and `instructions_pl` is the Polish translation; custom exercises only have `instructions`.
+The dataset does not rate difficulty or say how a set is tracked, so `difficulty`, `tracking` and `requires` of imported exercises are derived from their name and equipment (see `scripts/catalog/README.md`).
+
+`media` lists photos, then animations, then videos, each by `position`.
+An imported exercise has one photo (a 180x180 thumbnail for lists) and one animation (a 180x180 GIF of the movement); the three first-catalog exercises without a dataset counterpart keep their start (`0`) and finish (`1`) photos.
+A photo's or animation's `url` is relative to the API origin and works in a plain `<img src>`.
+`attribution` must be shown wherever the file is: the dataset's media are © Gym visual and not covered by the dataset's MIT licence.
 In an `Exercise`, `video_id` is the first YouTube video in `media` (a Vimeo video leaves it `null`); it stays for clients that predate `media`.
-Catalog photos are copied from the public domain Free Exercise DB into object storage in the background on API start, so right after a fresh deploy a photo can briefly return `404`.
+Catalog media are copied from their source into object storage in the background on API start, four at a time, so right after a fresh deploy a file can return `404` for a few minutes.
+The list leaves out both instruction texts because clients keep the whole library for offline use and the texts would double its size; read them from `GET /exercises/{id}` or the history.
+A client must therefore load one exercise before sending it back with `PUT`, or it would erase its instructions.
+Responses are gzip-compressed when the client accepts it; the library is about 1.2 MB of JSON before compression.
 
 `equipment` is a display category used for badges and the `equipment=` filter.
 `requires` is what matches exercises to places: an exercise can be done at a place when every item it requires is in the place's `equipment`.

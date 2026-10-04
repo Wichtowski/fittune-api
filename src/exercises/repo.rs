@@ -10,8 +10,14 @@ use crate::workouts::model::SetKind;
 
 macro_rules! exercise_columns {
     () => {
-        "id, owner_id, name, tracking, primary_muscle, secondary_muscles, equipment, requires, difficulty, \
-         instructions, owner_id IS NOT NULL AS is_custom, archived_at, created_at, updated_at"
+        exercise_columns!("instructions, instructions_pl")
+    };
+    ($instructions:literal) => {
+        concat!(
+            "id, owner_id, name, tracking, primary_muscle, secondary_muscles, equipment, requires, difficulty, ",
+            $instructions,
+            ", owner_id IS NOT NULL AS is_custom, archived_at, created_at, updated_at"
+        )
     };
 }
 
@@ -22,7 +28,9 @@ pub struct ExerciseFilter {
     pub equipment: Option<Equipment>,
 }
 
-/// Active exercises visible to `user_id`: the shared catalog plus the user's own.
+/// Active exercises visible to `user_id`: the shared catalog plus the user's own. Instruction
+/// texts are left out: they are most of the library's size, clients keep the whole list for
+/// offline use, and only the screen of one exercise shows them.
 pub async fn list(
     db: &PgPool,
     user_id: Uuid,
@@ -30,7 +38,7 @@ pub async fn list(
 ) -> sqlx::Result<Vec<Exercise>> {
     let mut exercises: Vec<Exercise> = sqlx::query_as(concat!(
         "SELECT ",
-        exercise_columns!(),
+        exercise_columns!("NULL::text AS instructions, NULL::text AS instructions_pl"),
         " FROM exercises
           WHERE (owner_id IS NULL OR owner_id = $1)
             AND archived_at IS NULL

@@ -7,6 +7,7 @@ pub mod diary;
 pub mod exercise;
 pub mod meals;
 pub mod nutrients;
+pub mod ocr;
 pub mod off;
 pub mod products;
 pub mod targets;
@@ -21,4 +22,5 @@ pub fn router() -> Router<AppState> {
         .merge(meals::router())
         .merge(diary::router())
         .merge(body::router())
+        .merge(ocr::router())
 }
