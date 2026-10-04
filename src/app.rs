@@ -11,6 +11,7 @@ use serde_json::json;
 use sqlx::PgPool;
 use tower::ServiceBuilder;
 use tower_http::{
+    compression::CompressionLayer,
     cors::{AllowOrigin, CorsLayer},
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, RequestId, SetRequestIdLayer},
     sensitive_headers::SetSensitiveRequestHeadersLayer,
@@ -113,6 +114,8 @@ pub fn router(state: AppState) -> Router {
                 .on_response(DefaultOnResponse::new().level(Level::INFO)),
         )
         .layer(PropagateRequestIdLayer::new(REQUEST_ID))
+        // The exercise library is over a megabyte of JSON; already compressed images pass through
+        .layer(CompressionLayer::new())
         .layer(cors(&state.config.cors_origins))
         .layer(TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(30)))
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES));

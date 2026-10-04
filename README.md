@@ -29,6 +29,7 @@ src/
 ├── activities/      - runs, rides, walks, ...
 └── stats/           - overview, timeline, muscle distribution, personal records
 migrations/          - schema and seeded exercise catalog
+scripts/catalog/     - generates the catalog import migration from the exercise dataset
 tests/api/           - HTTP integration tests against a real database
 ```
 

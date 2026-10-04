@@ -91,7 +91,30 @@ impl TestApp {
         if let Some(content_type) = content_type {
             builder = builder.header(header::CONTENT_TYPE, content_type);
         }
-        let request = builder.body(Body::from(bytes)).expect("valid request");
+        self.send(builder.body(Body::from(bytes)).expect("valid request"))
+            .await
+    }
+
+    /// A request without a body, with extra headers
+    pub async fn raw_with_headers(
+        &self,
+        method: Method,
+        uri: &str,
+        token: Option<&str>,
+        headers: &[(axum::http::HeaderName, &str)],
+    ) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
+        let mut builder = Request::builder().method(method).uri(uri);
+        if let Some(token) = token {
+            builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
+        }
+        for (name, value) in headers {
+            builder = builder.header(name, *value);
+        }
+        self.send(builder.body(Body::empty()).expect("valid request"))
+            .await
+    }
+
+    async fn send(&self, request: Request<Body>) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
         let response = self
             .router
             .clone()

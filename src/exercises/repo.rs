@@ -11,7 +11,7 @@ use crate::workouts::model::SetKind;
 macro_rules! exercise_columns {
     () => {
         "id, owner_id, name, tracking, primary_muscle, secondary_muscles, equipment, requires, difficulty, \
-         instructions, owner_id IS NOT NULL AS is_custom, archived_at, created_at, updated_at"
+         instructions, instructions_pl, owner_id IS NOT NULL AS is_custom, archived_at, created_at, updated_at"
     };
 }
 

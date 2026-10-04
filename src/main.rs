@@ -135,10 +135,10 @@ fn spawn_session_janitor(pool: sqlx::PgPool) {
     });
 }
 
-/// Copies catalog photos missing from storage once per start, without delaying requests.
+/// Copies catalog photos and animations missing from storage once per start, without delaying requests.
 fn spawn_catalog_media_backfill(state: &AppState) {
     let Some(store) = state.photos.clone() else {
-        tracing::info!("photo storage is not configured, skipping the catalog photo backfill");
+        tracing::info!("photo storage is not configured, skipping the catalog media backfill");
         return;
     };
     let db = state.db.clone();
@@ -152,9 +152,9 @@ fn spawn_catalog_media_backfill(state: &AppState) {
                 stored = summary.stored,
                 present = summary.present,
                 failed = summary.failed,
-                "catalog photo backfill finished"
+                "catalog media backfill finished"
             ),
-            Err(err) => tracing::warn!(error = format!("{err:#}"), "catalog photo backfill failed"),
+            Err(err) => tracing::warn!(error = format!("{err:#}"), "catalog media backfill failed"),
         }
     });
 }
