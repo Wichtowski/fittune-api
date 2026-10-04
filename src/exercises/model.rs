@@ -71,8 +71,16 @@ pub enum Difficulty {
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct Exercise {
     pub id: Uuid,
+    /// The user who created the exercise; `None` for the catalog. Clients get `is_own` and
+    /// `created_by` instead, so listing exercises does not hand out user ids
     #[serde(skip)]
     pub owner_id: Option<Uuid>,
+    /// Whether the user asking created the exercise and may change it; set where the exercise
+    /// is loaded for someone, and false until then
+    #[sqlx(skip)]
+    pub is_own: bool,
+    /// Display name of the owner, shown to everyone the exercise is shared with
+    pub created_by: Option<String>,
     pub name: String,
     pub tracking: Tracking,
     pub primary_muscle: Muscle,

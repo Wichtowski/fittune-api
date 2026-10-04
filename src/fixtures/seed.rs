@@ -351,17 +351,19 @@ fn by_name(items: &[Value], keep: impl Fn(&Value) -> bool) -> Result<HashMap<Str
         .collect()
 }
 
-/// The catalog and the account's custom exercises.
+/// The catalog and the account's own exercises. Everyone sees what other users created too,
+/// and names are only unique per owner, so those are left out: a plan must never pick up
+/// another account's exercise of the same name.
 async fn exercise_ids(api: &Api, token: Option<&str>) -> Result<HashMap<String, String>> {
-    by_name(&list(api, token, "/api/v1/train/exercises").await?, |_| {
-        true
+    by_name(&list(api, token, "/api/v1/train/exercises").await?, |e| {
+        e["is_custom"] == Value::Bool(false) || e["is_own"] == Value::Bool(true)
     })
 }
 
 /// Custom exercise ids come from the server, so an existing one with the same name is updated.
 async fn save_custom_exercises(api: &Api, token: Option<&str>, bodies: Vec<Value>) -> Result<()> {
     let existing = by_name(&list(api, token, "/api/v1/train/exercises").await?, |e| {
-        e["is_custom"] == Value::Bool(true)
+        e["is_own"] == Value::Bool(true)
     })?;
     for body in bodies {
         match existing.get(&text(&body, "/name")?.to_lowercase()) {
