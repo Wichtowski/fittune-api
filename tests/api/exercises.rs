@@ -64,7 +64,7 @@ async fn catalog_is_seeded_and_filterable(pool: PgPool) {
 }
 
 #[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
-async fn custom_exercises_are_private_to_their_owner(pool: PgPool) {
+async fn created_exercises_are_shared_and_credited(pool: PgPool) {
     let app = TestApp::new(pool);
     let owner = app.register("owner").await;
     let other = app.register("other").await;
@@ -85,17 +85,79 @@ async fn custom_exercises_are_private_to_their_owner(pool: PgPool) {
         .get("/api/v1/train/exercises?q=prowler", &owner.token)
         .await;
     assert_eq!(names(&list), ["Prowler Push"]);
+    assert_eq!(created["is_own"], true);
+    assert!(
+        created.get("owner_id").is_none(),
+        "user ids are not handed out with exercises"
+    );
+    assert_eq!(
+        created["created_by"], "owner",
+        "the username until a display name is set"
+    );
+
+    // Everyone can find and use it, and sees who made it
+    app.request(
+        axum::http::Method::PATCH,
+        "/api/v1/me",
+        Some(&owner.token),
+        Some(json!({ "display_name": "Olga Owner" })),
+    )
+    .await;
     let (_, list) = app
         .get("/api/v1/train/exercises?q=prowler", &other.token)
         .await;
-    assert!(names(&list).is_empty());
+    assert_eq!(names(&list), ["Prowler Push"]);
+    assert_eq!(list[0]["created_by"], "Olga Owner");
+    assert_eq!(list[0]["is_own"], false);
+    let uri = format!("/api/v1/train/exercises/{id}");
+    let (status, seen) = app.get(&uri, &other.token).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(seen["is_custom"], true);
+
+    // But only its owner or an admin changes it
+    let edit =
+        json!({ "name": "Prowler Push", "tracking": "reps", "primary_muscle": "quadriceps" });
     assert_eq!(
-        app.get(&format!("/api/v1/train/exercises/{id}"), &other.token)
-            .await
-            .0,
-        StatusCode::NOT_FOUND
+        app.put(&uri, &other.token, edit.clone()).await.0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        app.delete(&uri, &other.token).await.0,
+        StatusCode::FORBIDDEN
+    );
+    let admin = app.register("moderator").await;
+    app.make_admin(&admin).await;
+    let (status, moderated) = app.put(&uri, &admin.token, edit).await;
+    assert_eq!(status, StatusCode::OK, "{moderated}");
+    assert_eq!(moderated["tracking"], "reps");
+    assert_eq!(moderated["is_own"], false);
+    let (_, kept) = app.get(&uri, &owner.token).await;
+    assert_eq!(
+        kept["is_own"], true,
+        "an admin's edit does not take the exercise over"
     );
 
+    // Names are unique per owner, so someone else can have their own of the same name
+    let (status, twin) = app
+        .post(
+            "/api/v1/train/exercises",
+            Some(&other.token),
+            json!({ "name": "Prowler Push", "tracking": "duration", "primary_muscle": "quadriceps" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{twin}");
+    let (_, list) = app
+        .get("/api/v1/train/exercises?q=prowler", &other.token)
+        .await;
+    assert_eq!(list.as_array().map(Vec::len), Some(2));
+    let bench = app.catalog_exercise("Barbell Bench Press").await;
+    let (_, catalog) = app
+        .get(&format!("/api/v1/train/exercises/{bench}"), &other.token)
+        .await;
+    assert_eq!(catalog["is_own"], false);
+    assert_eq!(catalog["created_by"], serde_json::Value::Null);
+
+    // The owner cannot have two of the same name
     let (status, body) = app
         .post(
             "/api/v1/train/exercises",
@@ -108,6 +170,88 @@ async fn custom_exercises_are_private_to_their_owner(pool: PgPool) {
         body["fields"]["name"],
         "An exercise with this name already exists"
     );
+}
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn exercises_created_as_private_stay_private(pool: PgPool) {
+    let app = TestApp::new(pool.clone());
+    let owner = app.register("owner").await;
+    let other = app.register("other").await;
+    let admin = app.register("moderator").await;
+    app.make_admin(&admin).await;
+    let (_, created) = app
+        .post(
+            "/api/v1/train/exercises",
+            Some(&owner.token),
+            json!({ "name": "Rehab Drill", "tracking": "reps", "primary_muscle": "shoulders",
+                    "instructions": "What my physio told me" }),
+        )
+        .await;
+    let id = created["id"].as_str().expect("id");
+    // What the migration does to every exercise that existed before exercises were shared
+    sqlx::query("UPDATE exercises SET shared = false WHERE id = $1::uuid")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .expect("mark private");
+
+    let uri = format!("/api/v1/train/exercises/{id}");
+    let search = "/api/v1/train/exercises?q=rehab";
+    assert_eq!(
+        names(&app.get(search, &owner.token).await.1),
+        ["Rehab Drill"]
+    );
+    assert!(names(&app.get(search, &other.token).await.1).is_empty());
+    assert_eq!(app.get(&uri, &other.token).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(
+        app.get(&format!("{uri}/history"), &other.token).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let edit = json!({ "name": "Rehab Drill", "tracking": "reps", "primary_muscle": "shoulders" });
+    assert_eq!(
+        app.put(&uri, &other.token, edit).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let (status, body) = app
+        .post(
+            "/api/v1/train/routines",
+            Some(&other.token),
+            json!({ "name": "Borrowed", "exercises": [{ "exercise_id": id }] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+
+    // Admins moderate everything users created
+    assert_eq!(
+        names(&app.get(search, &admin.token).await.1),
+        ["Rehab Drill"]
+    );
+    assert_eq!(app.get(&uri, &admin.token).await.0, StatusCode::OK);
+
+    // An admin used it, so it outlives its owner's account. Without an owner it must not
+    // start counting as a catalog exercise that everyone sees
+    let (status, body) = app
+        .post(
+            "/api/v1/train/routines",
+            Some(&admin.token),
+            json!({ "name": "Moderated", "exercises": [{ "exercise_id": id }] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    let (status, body) = app
+        .request(
+            axum::http::Method::DELETE,
+            "/api/v1/me",
+            Some(&owner.token),
+            Some(json!({ "password": crate::common::PASSWORD })),
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+    assert_eq!(app.get(&uri, &other.token).await.0, StatusCode::NOT_FOUND);
+    assert!(names(&app.get(search, &other.token).await.1).is_empty());
+    let (status, kept) = app.get(&uri, &admin.token).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(kept["archived_at"].is_string());
 }
 
 #[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
