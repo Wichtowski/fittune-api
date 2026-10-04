@@ -77,24 +77,17 @@ pub async fn set_role(db: &PgPool, login: &str, role: Role) -> sqlx::Result<Opti
 /// Deletes the account and everything it owns. Workouts and routines go first, because they
 /// can reference the user's own exercises, which the account's own cascade removes.
 ///
-/// Everyone can use an exercise a user created, so one that other people's workouts or routines
-/// still reference cannot go with the account: it is handed to the catalog, without its
-/// creator. It is archived there when the catalog already has an exercise of that name, which
-/// keeps it in those people's history without a second entry in the library
+/// Others can use an exercise a user created, so one that other people's workouts or routines
+/// still reference cannot go with the account. It loses its owner and is archived: those
+/// people keep it in their history, but nothing a user wrote becomes part of the library the
+/// admins curate just because its author left
 pub async fn delete(db: &PgPool, id: Uuid) -> sqlx::Result<()> {
     let mut tx = db.begin().await?;
     for statement in [
         "DELETE FROM workouts WHERE user_id = $1",
         "DELETE FROM routines WHERE user_id = $1",
         "UPDATE exercises e
-         SET owner_id = NULL, updated_at = now(),
-             archived_at = CASE
-                 WHEN EXISTS (SELECT 1 FROM exercises c
-                              WHERE c.owner_id IS NULL AND c.archived_at IS NULL
-                                AND lower(c.name) = lower(e.name))
-                 THEN COALESCE(e.archived_at, now())
-                 ELSE e.archived_at
-             END
+         SET owner_id = NULL, updated_at = now(), archived_at = COALESCE(e.archived_at, now())
          WHERE e.owner_id = $1
            AND (EXISTS (SELECT 1 FROM workout_exercises we WHERE we.exercise_id = e.id)
                 OR EXISTS (SELECT 1 FROM routine_exercises re WHERE re.exercise_id = e.id))",

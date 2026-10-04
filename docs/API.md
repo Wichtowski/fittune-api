@@ -139,10 +139,11 @@ User {
 ## Exercises
 
 A shared catalog (seeded, admin-managed) plus the exercises users create, which everyone can see and use.
+Exercises created before they were shared stay visible to their owner and to admins only.
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET    | `/api/v1/train/exercises?q=&muscle=&equipment=` | Every active exercise: the catalog and what users created, sorted by name. `muscle` matches primary or secondary. `instructions` and `instructions_pl` are always `null` here. |
+| GET    | `/api/v1/train/exercises?q=&muscle=&equipment=` | Every active exercise the caller can see: the catalog and what users created, sorted by name. `muscle` matches primary or secondary. `instructions` and `instructions_pl` are always `null` here. |
 | GET    | `/api/v1/train/exercises/{id}` | Also returns archived exercises (history still references them). |
 | POST   | `/api/v1/train/exercises` | `ExerciseInput`; `"global": true` adds to the catalog (admin only). `201` |
 | PUT    | `/api/v1/train/exercises/{id}` | Full replace. Owners edit the exercises they created; admins edit the catalog and anyone's exercise. `403` otherwise. |
@@ -174,15 +175,16 @@ EquipmentItem = "barbell" | "ez_bar" | "trap_bar" | "dumbbells" | "kettlebells" 
               | "sledgehammer_tire"
 Muscle = "chest" | "lats" | "upper_back" | "lower_back" | "traps" | "shoulders" | "biceps" | "triceps"
        | "forearms" | "abs" | "quadriceps" | "hamstrings" | "glutes" | "calves" | "full_body" | "cardio"
-Exercise = ExerciseInput + { id, owner_id, created_by, instructions_pl, is_custom, archived_at, created_at, updated_at, media: [ExerciseMedia] }
+Exercise = ExerciseInput + { id, is_own, created_by, instructions_pl, is_custom, archived_at, created_at, updated_at, media: [ExerciseMedia] }
 ExerciseMedia = { "id", "kind": "photo" | "animation", "provider": "fittune", "position": 0,
                   "url": "/api/v1/train/exercise-media/{id}/file", "attribution": "© Gym visual - https://gymvisual.com/" }
               | { "id", "kind": "video", "provider": "youtube" | "vimeo", "position": 0, "external_id": "hWbUlkb5Ms4" }
 ```
 
-`owner_id` is the user who created the exercise and `created_by` their display name (their username until they set one); both are `null` for the catalog, and `is_custom` says whether there is an owner.
+`is_custom` says whether a user created the exercise, `created_by` is that user's display name (their username until they set one, `null` for the catalog) and `is_own` whether it was the caller.
+User ids are not part of an exercise.
 Names are unique per owner, so two users can each have an exercise of the same name; show `created_by` to tell them apart.
-When an account is deleted, its exercises that other people's workouts or routines still use are handed to the catalog (archived if the catalog already has that name) and the rest are deleted.
+When an account is deleted, its exercises that other people's workouts or routines still use lose their creator and are archived, so they stay in those people's history without entering the library; the rest are deleted.
 
 `strength_machines` and `cardio_machines` stand for any machine without an item of its own, such as a hack squat or an elliptical.
 

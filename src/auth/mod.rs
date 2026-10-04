@@ -22,6 +22,14 @@ impl Auth {
         self.0.user_id
     }
 
+    /// What decides which exercises this user sees
+    pub fn viewer(&self) -> crate::exercises::repo::Viewer {
+        crate::exercises::repo::Viewer {
+            user_id: self.user_id(),
+            admin: self.is_admin(),
+        }
+    }
+
     pub fn is_admin(&self) -> bool {
         self.0.role == Role::Admin
     }

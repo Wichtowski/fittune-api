@@ -22,6 +22,21 @@ macro_rules! exercise_columns {
     };
 }
 
+/// Who is asking: decides which exercises exist for them
+#[derive(Debug, Clone, Copy)]
+pub struct Viewer {
+    pub user_id: Uuid,
+    pub admin: bool,
+}
+
+/// The catalog, what users created and shared, the viewer's own, and for admins everything.
+/// Binds the viewer's id as `$1` and whether they are an admin as `$2`
+macro_rules! visible {
+    () => {
+        "(owner_id IS NULL OR shared OR owner_id = $1 OR $2)"
+    };
+}
+
 #[derive(Debug, Default)]
 pub struct ExerciseFilter {
     pub search: Option<String>,
@@ -29,46 +44,65 @@ pub struct ExerciseFilter {
     pub equipment: Option<Equipment>,
 }
 
-/// Every active exercise: the catalog and what users created, which everyone can use. Instruction
+/// Active exercises visible to `viewer`: the catalog and what users created. Instruction
 /// texts are left out: they are most of the library's size, clients keep the whole list for
 /// offline use, and only the screen of one exercise shows them.
-pub async fn list(db: &PgPool, filter: &ExerciseFilter) -> sqlx::Result<Vec<Exercise>> {
+pub async fn list(
+    db: &PgPool,
+    viewer: Viewer,
+    filter: &ExerciseFilter,
+) -> sqlx::Result<Vec<Exercise>> {
     let mut exercises: Vec<Exercise> = sqlx::query_as(concat!(
         "SELECT ",
         exercise_columns!("NULL::text AS instructions, NULL::text AS instructions_pl"),
         " FROM exercises
-          WHERE archived_at IS NULL
-            AND ($1::text IS NULL OR name ILIKE '%' || $1 || '%')
-            AND ($2::text IS NULL OR primary_muscle = $2 OR $2 = ANY (secondary_muscles))
-            AND ($3::text IS NULL OR equipment = $3)
+          WHERE ",
+        visible!(),
+        " AND archived_at IS NULL
+            AND ($3::text IS NULL OR name ILIKE '%' || $3 || '%')
+            AND ($4::text IS NULL OR primary_muscle = $4 OR $4 = ANY (secondary_muscles))
+            AND ($5::text IS NULL OR equipment = $5)
           ORDER BY lower(name), owner_id NULLS FIRST, id"
     ))
+    .bind(viewer.user_id)
+    .bind(viewer.admin)
     .bind(filter.search.as_deref().map(escape_like))
     .bind(filter.muscle)
     .bind(filter.equipment)
     .fetch_all(db)
     .await?;
     media::attach(db, &mut exercises).await?;
+    for exercise in &mut exercises {
+        exercise.is_own = exercise.owner_id == Some(viewer.user_id);
+    }
     Ok(exercises)
 }
 
-/// Any exercise, including archived ones (history still references them).
-pub async fn find(db: &PgPool, id: Uuid) -> sqlx::Result<Option<Exercise>> {
+/// Any exercise visible to `viewer`, including archived ones (history still references them).
+pub async fn find_visible(db: &PgPool, viewer: Viewer, id: Uuid) -> sqlx::Result<Option<Exercise>> {
     let mut exercise: Option<Exercise> = sqlx::query_as(concat!(
         "SELECT ",
         exercise_columns!(),
-        " FROM exercises WHERE id = $1"
+        " FROM exercises WHERE ",
+        visible!(),
+        " AND id = $3"
     ))
+    .bind(viewer.user_id)
+    .bind(viewer.admin)
     .bind(id)
     .fetch_optional(db)
     .await?;
     media::attach(db, exercise.as_mut_slice()).await?;
+    if let Some(exercise) = &mut exercise {
+        exercise.is_own = exercise.owner_id == Some(viewer.user_id);
+    }
     Ok(exercise)
 }
 
-/// Whether every id in `ids` refers to an exercise (archived ones included).
-pub async fn all_exist(
+/// Whether every id in `ids` refers to an exercise visible to `viewer` (archived ones included).
+pub async fn all_visible(
     db: impl PgExecutor<'_>,
+    viewer: Viewer,
     ids: impl IntoIterator<Item = Uuid>,
 ) -> sqlx::Result<bool> {
     let mut ids: Vec<Uuid> = ids.into_iter().collect();
@@ -77,11 +111,17 @@ pub async fn all_exist(
     if ids.is_empty() {
         return Ok(true);
     }
-    let existing: i64 = sqlx::query_scalar("SELECT count(*) FROM exercises WHERE id = ANY ($1)")
-        .bind(&ids)
-        .fetch_one(db)
-        .await?;
-    Ok(usize::try_from(existing).ok() == Some(ids.len()))
+    let visible: i64 = sqlx::query_scalar(concat!(
+        "SELECT count(*) FROM exercises WHERE ",
+        visible!(),
+        " AND id = ANY ($3)"
+    ))
+    .bind(viewer.user_id)
+    .bind(viewer.admin)
+    .bind(&ids)
+    .fetch_one(db)
+    .await?;
+    Ok(usize::try_from(visible).ok() == Some(ids.len()))
 }
 
 /// Media are written on the same connection, so pass a transaction.

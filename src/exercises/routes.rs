@@ -30,7 +30,7 @@ struct ListQuery {
 
 async fn list(
     State(state): State<AppState>,
-    _auth: Auth,
+    auth: Auth,
     Query(query): Query<ListQuery>,
 ) -> ApiResult<axum::Json<Vec<Exercise>>> {
     let filter = ExerciseFilter {
@@ -41,15 +41,17 @@ async fn list(
         muscle: query.muscle,
         equipment: query.equipment,
     };
-    Ok(axum::Json(repo::list(&state.db, &filter).await?))
+    Ok(axum::Json(
+        repo::list(&state.db, auth.viewer(), &filter).await?,
+    ))
 }
 
 async fn show(
     State(state): State<AppState>,
-    _auth: Auth,
+    auth: Auth,
     Path(id): Path<Uuid>,
 ) -> ApiResult<axum::Json<Exercise>> {
-    Ok(axum::Json(find(&state, id).await?))
+    Ok(axum::Json(visible(&state, &auth, id).await?))
 }
 
 async fn create(
@@ -69,7 +71,7 @@ async fn create(
         .await
         .map_err(duplicate_name)?;
     tx.commit().await?;
-    Ok((StatusCode::CREATED, axum::Json(exercise)))
+    Ok((StatusCode::CREATED, axum::Json(for_viewer(exercise, &auth))))
 }
 
 async fn update(
@@ -85,7 +87,7 @@ async fn update(
         .await
         .map_err(duplicate_name)?;
     tx.commit().await?;
-    Ok(axum::Json(exercise))
+    Ok(axum::Json(for_viewer(exercise, &auth)))
 }
 
 /// Archives rather than deletes, so past workouts keep their exercise.
@@ -115,7 +117,7 @@ async fn show_history(
     Path(id): Path<Uuid>,
     Query(query): Query<HistoryQuery>,
 ) -> ApiResult<axum::Json<ExerciseHistory>> {
-    let exercise = find(&state, id).await?;
+    let exercise = visible(&state, &auth, id).await?;
     let rows = repo::history_sets(&state.db, auth.user_id(), id).await?;
     let mut sessions = history::build_sessions(rows);
     let records = history::compute_records(&sessions);
@@ -127,20 +129,26 @@ async fn show_history(
     }))
 }
 
-async fn find(state: &AppState, id: Uuid) -> ApiResult<Exercise> {
-    repo::find(&state.db, id)
+async fn visible(state: &AppState, auth: &Auth, id: Uuid) -> ApiResult<Exercise> {
+    repo::find_visible(&state.db, auth.viewer(), id)
         .await?
         .ok_or(ApiError::NotFound("exercise"))
 }
 
-/// Everyone sees every exercise, but only its owner changes one a user created. Admins change
+/// Seeing a shared exercise does not allow changing it: only its owner does that. Admins change
 /// the catalog and moderate what users created.
 async fn editable(state: &AppState, auth: &Auth, id: Uuid) -> ApiResult<Exercise> {
-    let exercise = find(state, id).await?;
-    if exercise.owner_id != Some(auth.user_id()) {
+    let exercise = visible(state, auth, id).await?;
+    if !exercise.is_own {
         auth.require_admin()?;
     }
     Ok(exercise)
+}
+
+/// Marks an exercise that was just written as the caller's own or not
+fn for_viewer(mut exercise: Exercise, auth: &Auth) -> Exercise {
+    exercise.is_own = exercise.owner_id == Some(auth.user_id());
+    exercise
 }
 
 fn duplicate_name(err: sqlx::Error) -> ApiError {

@@ -85,7 +85,11 @@ async fn created_exercises_are_shared_and_credited(pool: PgPool) {
         .get("/api/v1/train/exercises?q=prowler", &owner.token)
         .await;
     assert_eq!(names(&list), ["Prowler Push"]);
-    assert_eq!(created["owner_id"], owner.id.as_str());
+    assert_eq!(created["is_own"], true);
+    assert!(
+        created.get("owner_id").is_none(),
+        "user ids are not handed out with exercises"
+    );
     assert_eq!(
         created["created_by"], "owner",
         "the username until a display name is set"
@@ -104,7 +108,7 @@ async fn created_exercises_are_shared_and_credited(pool: PgPool) {
         .await;
     assert_eq!(names(&list), ["Prowler Push"]);
     assert_eq!(list[0]["created_by"], "Olga Owner");
-    assert_eq!(list[0]["owner_id"], owner.id.as_str());
+    assert_eq!(list[0]["is_own"], false);
     let uri = format!("/api/v1/train/exercises/{id}");
     let (status, seen) = app.get(&uri, &other.token).await;
     assert_eq!(status, StatusCode::OK);
@@ -126,9 +130,10 @@ async fn created_exercises_are_shared_and_credited(pool: PgPool) {
     let (status, moderated) = app.put(&uri, &admin.token, edit).await;
     assert_eq!(status, StatusCode::OK, "{moderated}");
     assert_eq!(moderated["tracking"], "reps");
+    assert_eq!(moderated["is_own"], false);
+    let (_, kept) = app.get(&uri, &owner.token).await;
     assert_eq!(
-        moderated["owner_id"],
-        owner.id.as_str(),
+        kept["is_own"], true,
         "an admin's edit does not take the exercise over"
     );
 
@@ -149,9 +154,10 @@ async fn created_exercises_are_shared_and_credited(pool: PgPool) {
     let (_, catalog) = app
         .get(&format!("/api/v1/train/exercises/{bench}"), &other.token)
         .await;
-    assert_eq!(catalog["owner_id"], serde_json::Value::Null);
+    assert_eq!(catalog["is_own"], false);
     assert_eq!(catalog["created_by"], serde_json::Value::Null);
 
+    // The owner cannot have two of the same name
     let (status, body) = app
         .post(
             "/api/v1/train/exercises",
@@ -164,6 +170,63 @@ async fn created_exercises_are_shared_and_credited(pool: PgPool) {
         body["fields"]["name"],
         "An exercise with this name already exists"
     );
+}
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn exercises_created_as_private_stay_private(pool: PgPool) {
+    let app = TestApp::new(pool.clone());
+    let owner = app.register("owner").await;
+    let other = app.register("other").await;
+    let admin = app.register("moderator").await;
+    app.make_admin(&admin).await;
+    let (_, created) = app
+        .post(
+            "/api/v1/train/exercises",
+            Some(&owner.token),
+            json!({ "name": "Rehab Drill", "tracking": "reps", "primary_muscle": "shoulders",
+                    "instructions": "What my physio told me" }),
+        )
+        .await;
+    let id = created["id"].as_str().expect("id");
+    // What the migration does to every exercise that existed before exercises were shared
+    sqlx::query("UPDATE exercises SET shared = false WHERE id = $1::uuid")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .expect("mark private");
+
+    let uri = format!("/api/v1/train/exercises/{id}");
+    let search = "/api/v1/train/exercises?q=rehab";
+    assert_eq!(
+        names(&app.get(search, &owner.token).await.1),
+        ["Rehab Drill"]
+    );
+    assert!(names(&app.get(search, &other.token).await.1).is_empty());
+    assert_eq!(app.get(&uri, &other.token).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(
+        app.get(&format!("{uri}/history"), &other.token).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let edit = json!({ "name": "Rehab Drill", "tracking": "reps", "primary_muscle": "shoulders" });
+    assert_eq!(
+        app.put(&uri, &other.token, edit).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let (status, body) = app
+        .post(
+            "/api/v1/train/routines",
+            Some(&other.token),
+            json!({ "name": "Borrowed", "exercises": [{ "exercise_id": id }] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+
+    // Admins moderate everything users created
+    assert_eq!(
+        names(&app.get(search, &admin.token).await.1),
+        ["Rehab Drill"]
+    );
+    assert_eq!(app.get(&uri, &admin.token).await.0, StatusCode::OK);
 }
 
 #[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]

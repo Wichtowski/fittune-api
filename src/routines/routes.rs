@@ -37,7 +37,7 @@ async fn create(
     Json(request): Json<RoutineRequest>,
 ) -> ApiResult<(StatusCode, axum::Json<Routine>)> {
     let draft = request.validate()?;
-    ensure_exercises_exist(&state, &draft).await?;
+    ensure_exercises_visible(&state, &auth, &draft).await?;
 
     let mut tx = state.db.begin().await?;
     let id = repo::insert(&mut tx, auth.user_id(), &draft).await?;
@@ -55,7 +55,7 @@ async fn update(
     Json(request): Json<RoutineRequest>,
 ) -> ApiResult<axum::Json<Routine>> {
     let draft = request.validate()?;
-    ensure_exercises_exist(&state, &draft).await?;
+    ensure_exercises_visible(&state, &auth, &draft).await?;
 
     let mut tx = state.db.begin().await?;
     if !repo::update(&mut tx, auth.user_id(), id, &draft).await? {
@@ -83,9 +83,13 @@ async fn find(state: &AppState, auth: &Auth, id: Uuid) -> ApiResult<Routine> {
         .ok_or(ApiError::NotFound("routine"))
 }
 
-async fn ensure_exercises_exist(state: &AppState, draft: &RoutineDraft) -> ApiResult<()> {
+async fn ensure_exercises_visible(
+    state: &AppState,
+    auth: &Auth,
+    draft: &RoutineDraft,
+) -> ApiResult<()> {
     let ids = draft.exercises.iter().map(|e| e.exercise_id);
-    if exercises::repo::all_exist(&state.db, ids).await? {
+    if exercises::repo::all_visible(&state.db, auth.viewer(), ids).await? {
         Ok(())
     } else {
         Err(ApiError::validation(

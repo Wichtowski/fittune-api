@@ -344,8 +344,8 @@ async fn account_deletion_keeps_exercises_other_people_use(pool: PgPool) {
     let creator = app.register("creator").await;
     let lifter = app.register("lifter").await;
     let mut ids = Vec::new();
-    // One the catalog has no name for, one it already has, and one nobody else used
-    for name in ["Zercher Carry", "barbell bench press", "Unused Lift"] {
+    // Two that someone else uses and one nobody else does
+    for name in ["Zercher Carry", "Viking Press", "Unused Lift"] {
         let (status, exercise) = app
             .post(
                 "/api/v1/train/exercises",
@@ -399,18 +399,19 @@ async fn account_deletion_keeps_exercises_other_people_use(pool: PgPool) {
         let (app, token) = (&app, lifter.token.clone());
         async move { app.get(&uri, &token).await }
     };
-    let (status, carried) = exercise(&ids[0]).await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(carried["is_custom"], false, "handed to the catalog");
-    assert_eq!(carried["created_by"], Value::Null);
-    assert_eq!(carried["archived_at"], Value::Null);
-
-    let (status, clashing) = exercise(&ids[1]).await;
-    assert_eq!(status, StatusCode::OK);
-    assert!(
-        clashing["archived_at"].is_string(),
-        "the catalog already has a bench press, so this one only stays for the routine"
-    );
+    for id in &ids[..2] {
+        let (status, kept) = exercise(id).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(kept["created_by"], Value::Null, "the creator is gone");
+        assert!(
+            kept["archived_at"].is_string(),
+            "kept for history, but not added to the library"
+        );
+    }
+    let (_, library) = app
+        .get("/api/v1/train/exercises?q=zercher%20carry", &lifter.token)
+        .await;
+    assert_eq!(library, json!([]));
 
     assert_eq!(exercise(&ids[2]).await.0, StatusCode::NOT_FOUND);
 }
