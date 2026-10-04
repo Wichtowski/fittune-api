@@ -8,6 +8,7 @@ FIXTURES_DATABASE_URL ?= $(or $(FITTUNE_FIXTURES_DATABASE_URL),$(shell sed -n 's
 .PHONY: help up down run catalog seed seed-reset reset run-fixtures check fmt lint test build docker-build backend-compose create-admin grant-admin prod-create-admin prod-grant-admin prod-ps prod-logs
 
 help:
+	@echo "  reconcile-photos - queue orphaned progress-photo objects and retry storage cleanup"
 	@echo "fittune-api targets:"
 	@echo "  up              — start local Postgres and RustFS (docker compose)"
 	@echo "  down            — stop local infrastructure"
@@ -101,3 +102,6 @@ prod-ps:
 
 prod-logs:
 	$(COMPOSE_PROD) logs -f --tail=200 fittune-api
+
+reconcile-photos:
+	cargo run -- reconcile-photos

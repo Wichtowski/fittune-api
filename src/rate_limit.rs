@@ -40,6 +40,11 @@ impl RateLimiter {
 
     /// Atomically checks and counts one event, so concurrent bursts cannot overshoot the limit
     pub fn try_record(&self, key: &str) -> bool {
+        self.reserve(key).is_some()
+    }
+
+    /// Counts an in-flight attempt atomically and returns its window for a verified success refund
+    pub fn reserve(&self, key: &str) -> Option<Instant> {
         let mut events = self
             .events
             .lock()
@@ -52,10 +57,23 @@ impl RateLimiter {
             *entry = (Instant::now(), 0);
         }
         if entry.1 >= self.max_events {
-            return false;
+            return None;
         }
         entry.1 += 1;
-        true
+        Some(entry.0)
+    }
+
+    /// Releases a verified successful attempt without changing a newer window's count
+    pub fn refund(&self, key: &str, window: Instant) {
+        let mut events = self
+            .events
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some((started, count)) = events.get_mut(key)
+            && *started == window
+        {
+            *count = count.saturating_sub(1);
+        }
     }
 
     pub fn record(&self, key: &str) {
@@ -102,5 +120,16 @@ mod tests {
         let limiter = RateLimiter::new(1, Duration::ZERO);
         limiter.record("a");
         assert!(limiter.allows("a"));
+    }
+
+    #[test]
+    fn successful_attempts_are_refunded_only_in_their_own_window() {
+        let limiter = RateLimiter::new(1, Duration::from_secs(60));
+        let window = limiter.reserve("a").expect("admitted");
+        assert!(!limiter.try_record("a"));
+        limiter.refund("a", window + Duration::from_secs(1));
+        assert!(!limiter.try_record("a"));
+        limiter.refund("a", window);
+        assert!(limiter.try_record("a"));
     }
 }

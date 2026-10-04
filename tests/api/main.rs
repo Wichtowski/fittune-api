@@ -16,6 +16,8 @@ mod invites;
 mod namespaces;
 mod ocr;
 mod off_import;
+mod photo_cleanup;
+mod photo_limits;
 mod photos;
 mod places;
 mod routines;

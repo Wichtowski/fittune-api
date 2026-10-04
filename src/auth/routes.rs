@@ -153,9 +153,14 @@ async fn login(
     // Throttle per client and per account before any hashing, so guessing and CPU abuse are both bounded
     let client_key = format!("login-ip:{client}");
     let account_key = format!("login-account:{}", login.to_lowercase());
-    if !state.login_attempts.allows(&client_key) || !state.login_attempts.allows(&account_key) {
-        return Err(ApiError::RateLimited);
-    }
+    let client_window = state
+        .login_attempts
+        .reserve(&client_key)
+        .ok_or(ApiError::RateLimited)?;
+    let account_window = state
+        .login_attempts
+        .reserve(&account_key)
+        .ok_or(ApiError::RateLimited)?;
 
     let credentials: Option<(Uuid, String)> = sqlx::query_as(
         "SELECT id, password_hash FROM users WHERE lower(username) = lower($1) OR lower(email) = lower($1)",
@@ -166,15 +171,14 @@ async fn login(
 
     let Some((user_id, password_hash)) = credentials else {
         password::verify_dummy(request.password).await?;
-        state.login_attempts.record(&client_key);
-        state.login_attempts.record(&account_key);
         return Err(ApiError::InvalidCredentials);
     };
     if !password::verify(request.password, password_hash).await? {
-        state.login_attempts.record(&client_key);
-        state.login_attempts.record(&account_key);
         return Err(ApiError::InvalidCredentials);
     }
+
+    state.login_attempts.refund(&client_key, client_window);
+    state.login_attempts.refund(&account_key, account_window);
 
     let session = session::create(
         &state.db,

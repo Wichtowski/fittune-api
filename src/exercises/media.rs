@@ -196,21 +196,20 @@ async fn file(State(state): State<AppState>, Path(id): Path<Uuid>) -> ApiResult<
         None => return Err(ApiError::NotFound("media")),
     };
     let store = state.photos.clone().ok_or(ApiError::StorageUnavailable)?;
-    if !store.exists(&key).await.map_err(ApiError::Internal)? {
+    let Some(body) = store.get(&key).await.map_err(ApiError::Internal)? else {
         // The bucket lost the file: have the next backfill copy it again
         sqlx::query("UPDATE exercise_media SET stored_at = NULL WHERE id = $1")
             .bind(id)
             .execute(&state.db)
             .await?;
         return Err(ApiError::NotFound("media"));
-    }
-    let bytes = store.get(&key).await.map_err(ApiError::Internal)?;
+    };
     Ok((
         [
             (header::CONTENT_TYPE, content_type),
             (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
         ],
-        bytes,
+        body,
     ))
 }
 

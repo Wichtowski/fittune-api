@@ -31,6 +31,9 @@ pub fn config(registration: Registration) -> Config {
         app_version: "test".into(),
         log_format: LogFormat::Pretty,
         photo_storage: None,
+        photo_max_count: 500,
+        photo_max_bytes: 512 * 1024 * 1024,
+        photo_upload_concurrency: 1,
         registration,
         client_ip_header: Some(header::HeaderName::from_static("x-real-ip")),
     }
@@ -72,6 +75,11 @@ impl TestApp {
     ) -> Self {
         let mut state = AppState::new(pool.clone(), config(registration));
         state.photos = photos;
+        Self::with_state(state)
+    }
+
+    pub fn with_state(state: AppState) -> Self {
+        let pool = state.db.clone();
         let router = router(state);
         Self { router, pool }
     }
@@ -140,7 +148,8 @@ impl TestApp {
         token: Option<&str>,
         body: Option<Value>,
     ) -> (StatusCode, Value) {
-        self.request_from(None, method, uri, token, body).await
+        self.request_from(Some("127.0.0.1"), method, uri, token, body)
+            .await
     }
 
     /// A request as if forwarded by the proxy for client `ip`

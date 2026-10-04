@@ -256,6 +256,7 @@ async fn catalog_media_files_are_public_and_cacheable(pool: PgPool) {
             .execute(&pool)
             .await
             .expect("mark stored");
+        let heads_before = memory.1.load(std::sync::atomic::Ordering::SeqCst);
         let (status, headers, body) = app.raw(Method::GET, url, None, None, vec![]).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(headers[header::CONTENT_TYPE], content_type);
@@ -264,6 +265,11 @@ async fn catalog_media_files_are_public_and_cacheable(pool: PgPool) {
             "public, max-age=31536000, immutable"
         );
         assert_eq!(body, bytes);
+        assert_eq!(
+            memory.1.load(std::sync::atomic::Ordering::SeqCst),
+            heads_before,
+            "media reads must not send a redundant HEAD request"
+        );
     }
 
     let video_id = media_of_kind(&exercise, "video")[0]["id"]

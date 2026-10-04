@@ -42,10 +42,9 @@ pub fn router() -> Router<AppState> {
 /// Counts a lookup or request against the caller's hourly allowance
 fn spend_friend_action(state: &AppState, auth: &Auth) -> ApiResult<()> {
     let key = auth.user_id().to_string();
-    if !state.friend_actions.allows(&key) {
+    if !state.friend_actions.try_record(&key) {
         return Err(ApiError::RateLimited);
     }
-    state.friend_actions.record(&key);
     Ok(())
 }
 

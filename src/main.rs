@@ -21,7 +21,7 @@ use fittune_api::{
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
-const USAGE: &str = "usage: fittune-api [serve | migrate | healthcheck | create-admin <username> <email> | grant-admin <username-or-email> | import-off <openfoodfacts.csv>]";
+const USAGE: &str = "usage: fittune-api [serve | migrate | healthcheck | create-admin <username> <email> | grant-admin <username-or-email> | import-off <openfoodfacts.csv> | reconcile-photos]";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -46,6 +46,7 @@ async fn main() -> Result<()> {
         ["create-admin", username, email] => create_admin(username, email).await,
         ["grant-admin", login] => grant_admin(login).await,
         ["import-off", path] => import_off(path).await,
+        ["reconcile-photos"] => reconcile_photos().await,
         #[cfg(feature = "dev-fixtures")]
         ["seed-dev", flags @ ..] => seed_dev::run(flags).await,
         _ => bail!("{USAGE}"),
@@ -77,8 +78,44 @@ async fn import_off(path: &str) -> Result<()> {
     Ok(())
 }
 
+/// Operator sweep for storage keys left by earlier API versions, plus queued cleanup retries
+async fn reconcile_photos() -> Result<()> {
+    let config = Config::from_env()?;
+    init_tracing(config.log_format);
+    let storage = fittune_api::photos::S3PhotoStore::new(
+        config
+            .photo_storage
+            .as_ref()
+            .context("photo storage must be configured")?,
+    );
+    let pool = db::connect(&config.database_url, 2).await?;
+    db::migrate(&pool).await?;
+    let queued = storage.queue_orphans(&pool).await?;
+    let mut deleted = 0;
+    loop {
+        let summary = fittune_api::photos::cleanup::drain(&pool, &storage, 100).await?;
+        deleted += summary.deleted;
+        if summary.failed > 0 {
+            bail!(
+                "queued {queued} orphan photos; cleaned {deleted}; {} cleanups failed and remain queued",
+                summary.failed
+            );
+        }
+        if summary.deleted == 0 {
+            break;
+        }
+    }
+    println!("Queued {queued} orphan photos; cleaned {deleted}");
+    Ok(())
+}
+
 async fn serve(config: Config) -> Result<()> {
     init_tracing(config.log_format);
+    if config.client_ip_header.is_none() {
+        tracing::warn!(
+            "client IP header is unset; rate limiting uses socket addresses, configure an overwriting trusted proxy header behind a proxy"
+        );
+    }
 
     let pool = db::connect(&config.database_url, config.db_max_connections).await?;
     db::migrate(&pool).await?;
@@ -91,6 +128,7 @@ async fn serve(config: Config) -> Result<()> {
 
     let state = AppState::new(pool.clone(), config);
     spawn_catalog_media_backfill(&state);
+    spawn_photo_cleanup(&state);
     let app = router(state);
     // Connection info gives rate limiting a client address when no proxy header is configured
     axum::serve(
@@ -155,6 +193,25 @@ fn spawn_catalog_media_backfill(state: &AppState) {
                 "catalog media backfill finished"
             ),
             Err(err) => tracing::warn!(error = format!("{err:#}"), "catalog media backfill failed"),
+        }
+    });
+}
+
+/// Retries storage cleanup after account cascades, deleted photos and abandoned uploads
+fn spawn_photo_cleanup(state: &AppState) {
+    let Some(storage) = state.photos.clone() else {
+        return;
+    };
+    let db = state.db.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        loop {
+            interval.tick().await;
+            if let Err(error) =
+                fittune_api::photos::cleanup::drain(&db, storage.as_ref(), 100).await
+            {
+                tracing::warn!(%error, "photo cleanup sweep failed");
+            }
         }
     });
 }

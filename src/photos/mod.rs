@@ -1,11 +1,11 @@
+pub mod cleanup;
+mod storage;
+
+pub use storage::{PhotoStore, S3PhotoStore};
+
 use std::{io::Cursor, sync::Arc};
 
-use anyhow::{Context, Result};
-use async_trait::async_trait;
-use aws_sdk_s3::{
-    Client,
-    config::{BehaviorVersion, Credentials, Region},
-};
+use anyhow::Result;
 use axum::{
     Json, Router,
     body::Bytes,
@@ -25,108 +25,11 @@ use uuid::Uuid;
 use crate::{
     app::AppState,
     auth::Auth,
-    config::PhotoStorageConfig,
     error::{ApiError, ApiResult},
 };
 
 const MAX_UPLOAD: usize = 10 * 1024 * 1024;
 const MAX_PIXELS: u64 = 12_000_000;
-
-#[async_trait]
-pub trait PhotoStore: Send + Sync {
-    async fn put(&self, key: &str, bytes: Vec<u8>) -> Result<()>;
-    async fn exists(&self, key: &str) -> Result<bool>;
-    async fn get(&self, key: &str) -> Result<Vec<u8>>;
-    async fn delete(&self, key: &str) -> Result<()>;
-}
-
-pub struct S3PhotoStore {
-    client: Client,
-    bucket: String,
-}
-
-impl S3PhotoStore {
-    pub fn new(config: &PhotoStorageConfig) -> Self {
-        let credentials = Credentials::new(
-            &config.access_key,
-            &config.secret_key,
-            None,
-            None,
-            "fittune",
-        );
-        let sdk = aws_sdk_s3::Config::builder()
-            .behavior_version(BehaviorVersion::latest())
-            .region(Region::new("us-east-1"))
-            .endpoint_url(&config.endpoint)
-            .credentials_provider(credentials)
-            .force_path_style(true)
-            .build();
-        Self {
-            client: Client::from_conf(sdk),
-            bucket: config.bucket.clone(),
-        }
-    }
-}
-
-#[async_trait]
-impl PhotoStore for S3PhotoStore {
-    async fn put(&self, key: &str, bytes: Vec<u8>) -> Result<()> {
-        self.client
-            .put_object()
-            .bucket(&self.bucket)
-            .key(key)
-            .content_type("image/jpeg")
-            .body(bytes.into())
-            .send()
-            .await
-            .context("RustFS put_object failed")?;
-        Ok(())
-    }
-
-    async fn exists(&self, key: &str) -> Result<bool> {
-        match self
-            .client
-            .head_object()
-            .bucket(&self.bucket)
-            .key(key)
-            .send()
-            .await
-        {
-            Ok(_) => Ok(true),
-            Err(err) if err.as_service_error().is_some_and(|err| err.is_not_found()) => Ok(false),
-            Err(err) => Err(anyhow::Error::new(err).context("RustFS head_object failed")),
-        }
-    }
-
-    async fn get(&self, key: &str) -> Result<Vec<u8>> {
-        let response = self
-            .client
-            .get_object()
-            .bucket(&self.bucket)
-            .key(key)
-            .send()
-            .await
-            .context("RustFS get_object failed")?;
-        Ok(response
-            .body
-            .collect()
-            .await
-            .context("RustFS object read failed")?
-            .into_bytes()
-            .to_vec())
-    }
-
-    async fn delete(&self, key: &str) -> Result<()> {
-        self.client
-            .delete_object()
-            .bucket(&self.bucket)
-            .key(key)
-            .send()
-            .await
-            .context("RustFS delete_object failed")?;
-        Ok(())
-    }
-}
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct ProgressPhoto {
@@ -233,6 +136,11 @@ async fn upload(
     if let Some(existing) = find(&state, auth.user_id(), id).await? {
         return Ok((StatusCode::OK, Json(existing.public())));
     }
+    let permit = state
+        .photo_uploads
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| ApiError::RateLimited)?;
     let mut workout_id = None;
     let mut image = None;
     while let Some(field) = multipart.next_field().await.map_err(multipart_error)? {
@@ -274,11 +182,55 @@ async fn upload(
             ));
         }
     }
-    let processed = tokio::task::spawn_blocking(move || process_image(&image))
+    // Keep the permit in the blocking task even if the request times out or disconnects
+    let (_permit, processed) = tokio::task::spawn_blocking(move || (permit, process_image(&image)))
         .await
-        .map_err(|e| ApiError::Internal(e.into()))??;
-    let key = format!("photos/{}/{id}", auth.user_id());
+        .map_err(|e| ApiError::Internal(e.into()))?;
+    let processed = processed?;
+    // Each attempt has its own keys, so a losing retry cannot overwrite or delete a winner
+    let key = format!("photos/{}/{id}/{}", auth.user_id(), Uuid::new_v4());
+    cleanup::reserve(&state.db, &key).await?;
+    let mut tx = state.db.begin().await?;
+    let user: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE id = $1 FOR UPDATE")
+        .bind(auth.user_id())
+        .fetch_optional(&mut *tx)
+        .await?;
+    if user.is_none() {
+        return Err(ApiError::Unauthorized);
+    }
+    let existing: Option<StoredPhoto> = sqlx::query_as(
+        "SELECT id, workout_id, storage_key, width, height, bytes, taken_at, created_at
+         FROM progress_photos WHERE id = $1 AND user_id = $2",
+    )
+    .bind(id)
+    .bind(auth.user_id())
+    .fetch_optional(&mut *tx)
+    .await?;
+    if let Some(existing) = existing {
+        return Ok((StatusCode::OK, Json(existing.public())));
+    }
+    let foreign_id: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM progress_photos WHERE id = $1 AND user_id <> $2)",
+    )
+    .bind(id)
+    .bind(auth.user_id())
+    .fetch_one(&mut *tx)
+    .await?;
+    if foreign_id {
+        return Err(ApiError::Conflict("photo id is already in use".into()));
+    }
     let full_len = processed.full.len();
+    let stored_bytes = (full_len + processed.thumb.len()) as i64;
+    let (count, bytes): (i64, i64) = sqlx::query_as(
+        "SELECT count(*), COALESCE(sum(stored_bytes), 0)::bigint FROM progress_photos WHERE user_id = $1")
+        .bind(auth.user_id()).fetch_one(&mut *tx).await?;
+    if count >= state.config.photo_max_count || bytes + stored_bytes > state.config.photo_max_bytes
+    {
+        return Err(ApiError::validation(
+            "file",
+            "Photo quota reached; delete older photos before uploading more",
+        ));
+    }
     storage
         .put(&format!("{key}/full.jpg"), processed.full)
         .await
@@ -287,12 +239,12 @@ async fn upload(
         .put(&format!("{key}/thumb.jpg"), processed.thumb)
         .await
     {
-        discard_object(storage.as_ref(), &format!("{key}/full.jpg")).await;
+        cleanup::expedite(&state.db, &key).await?;
         return Err(ApiError::Internal(err));
     }
     let inserted: Result<StoredPhoto, sqlx::Error> = sqlx::query_as(
-        "INSERT INTO progress_photos (id, user_id, workout_id, storage_key, width, height, bytes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        "INSERT INTO progress_photos (id, user_id, workout_id, storage_key, width, height, bytes, stored_bytes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING id, workout_id, storage_key, width, height, bytes, taken_at, created_at",
     )
     .bind(id)
@@ -302,30 +254,26 @@ async fn upload(
     .bind(processed.width as i32)
     .bind(processed.height as i32)
     .bind(full_len as i32)
-    .fetch_one(&state.db)
+    .bind(stored_bytes)
+    .fetch_one(&mut *tx)
     .await;
     match inserted {
-        Ok(photo) => Ok((StatusCode::CREATED, Json(photo.public()))),
+        Ok(photo) => {
+            sqlx::query("DELETE FROM photo_cleanup WHERE storage_key = $1")
+                .bind(&key)
+                .execute(&mut *tx)
+                .await?;
+            tx.commit().await?;
+            Ok((StatusCode::CREATED, Json(photo.public())))
+        }
         Err(err) => {
-            if crate::error::unique_violation(&err).is_some()
-                && let Some(existing) = find(&state, auth.user_id(), id).await?
-            {
-                return Ok((StatusCode::OK, Json(existing.public())));
-            }
-            discard_object(storage.as_ref(), &format!("{key}/full.jpg")).await;
-            discard_object(storage.as_ref(), &format!("{key}/thumb.jpg")).await;
+            tx.rollback().await?;
+            cleanup::expedite(&state.db, &key).await?;
             if crate::error::unique_violation(&err).is_some() {
                 return Err(ApiError::Conflict("photo id is already in use".into()));
             }
             Err(err.into())
         }
-    }
-}
-
-/// Best-effort cleanup of an object written for an upload that failed, logging instead of failing
-async fn discard_object(storage: &dyn PhotoStore, key: &str) {
-    if let Err(error) = storage.delete(key).await {
-        tracing::warn!(key, %error, "failed to clean up photo object");
     }
 }
 
@@ -425,7 +373,8 @@ async fn file(
     let bytes = store(&state)?
         .get(&format!("{}/{suffix}.jpg", photo.storage_key))
         .await
-        .map_err(ApiError::Internal)?;
+        .map_err(ApiError::Internal)?
+        .ok_or(ApiError::NotFound("photo"))?;
     Ok((
         [
             (header::CONTENT_TYPE, "image/jpeg"),
@@ -440,47 +389,16 @@ async fn delete(
     auth: Auth,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
-    let photo = find(&state, auth.user_id(), id)
-        .await?
-        .ok_or(ApiError::NotFound("photo"))?;
-    let storage = store(&state)?;
-    storage
-        .delete(&format!("{}/full.jpg", photo.storage_key))
-        .await
-        .map_err(ApiError::Internal)?;
-    storage
-        .delete(&format!("{}/thumb.jpg", photo.storage_key))
-        .await
-        .map_err(ApiError::Internal)?;
-    sqlx::query("DELETE FROM progress_photos WHERE id = $1 AND user_id = $2")
-        .bind(id)
-        .bind(auth.user_id())
-        .execute(&state.db)
-        .await?;
+    let key: Option<String> = sqlx::query_scalar(
+        "DELETE FROM progress_photos WHERE id = $1 AND user_id = $2 RETURNING storage_key",
+    )
+    .bind(id)
+    .bind(auth.user_id())
+    .fetch_optional(&state.db)
+    .await?;
+    key.ok_or(ApiError::NotFound("photo"))?;
+    cleanup::after_delete(&state).await;
     Ok(StatusCode::NO_CONTENT)
-}
-
-pub async fn delete_all_for_user(state: &AppState, user_id: Uuid) -> ApiResult<()> {
-    let keys: Vec<String> =
-        sqlx::query_scalar("SELECT storage_key FROM progress_photos WHERE user_id = $1")
-            .bind(user_id)
-            .fetch_all(&state.db)
-            .await?;
-    if keys.is_empty() {
-        return Ok(());
-    }
-    let storage = store(state)?;
-    for key in keys {
-        storage
-            .delete(&format!("{key}/full.jpg"))
-            .await
-            .map_err(ApiError::Internal)?;
-        storage
-            .delete(&format!("{key}/thumb.jpg"))
-            .await
-            .map_err(ApiError::Internal)?;
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -507,10 +425,11 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "requires local RustFS; see README for the explicit command"]
     async fn rustfs_round_trip_when_configured() {
-        let Ok(endpoint) = std::env::var("RUSTFS_TEST_ENDPOINT") else {
-            return;
-        };
+        use crate::config::PhotoStorageConfig;
+        use http_body_util::BodyExt;
+        let endpoint = std::env::var("RUSTFS_TEST_ENDPOINT").expect("test endpoint");
         let store = S3PhotoStore::new(&PhotoStorageConfig {
             endpoint,
             bucket: std::env::var("RUSTFS_TEST_BUCKET").expect("test bucket"),
@@ -522,7 +441,12 @@ mod tests {
             .put(&key, b"private test".to_vec())
             .await
             .expect("put");
-        assert_eq!(store.get(&key).await.expect("get"), b"private test");
+        let body = store.get(&key).await.expect("get").expect("object exists");
+        assert_eq!(
+            body.collect().await.expect("read body").to_bytes(),
+            b"private test"[..]
+        );
         store.delete(&key).await.expect("delete");
+        assert!(store.get(&key).await.expect("missing get").is_none());
     }
 }

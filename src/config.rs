@@ -1,7 +1,7 @@
 use std::{env, net::SocketAddr, time::Duration};
 
 use anyhow::{Context, Result, bail};
-use axum::http::HeaderName;
+use axum::http::{HeaderName, HeaderValue, Uri};
 
 /// Runtime configuration, read from `FITTUNE_*` environment variables.
 #[derive(Clone)]
@@ -17,6 +17,9 @@ pub struct Config {
     pub app_version: String,
     pub log_format: LogFormat,
     pub photo_storage: Option<PhotoStorageConfig>,
+    pub photo_max_count: i64,
+    pub photo_max_bytes: i64,
+    pub photo_upload_concurrency: usize,
     pub registration: Registration,
     /// Header carrying the client IP from a trusted reverse proxy, such as `X-Real-IP`.
     /// Without it the socket address is used, which behind a proxy is the proxy itself
@@ -118,11 +121,20 @@ impl Config {
             database_url,
             db_max_connections,
             bind_addr,
-            cors_origins: parse_origins(&var_or("FITTUNE_CORS_ORIGINS", "http://localhost:5173")),
+            cors_origins: parse_origins(&var_or("FITTUNE_CORS_ORIGINS", "http://localhost:5173"))?,
             session_ttl: Duration::from_secs(session_ttl_hours * 60 * 60),
             app_version: var_or("FITTUNE_APP_VERSION", "dev"),
             log_format,
             photo_storage,
+            photo_max_count: positive_i64("FITTUNE_PHOTO_MAX_COUNT", "500")?,
+            photo_max_bytes: positive_i64("FITTUNE_PHOTO_MAX_BYTES", "536870912")?,
+            photo_upload_concurrency: {
+                let limit = positive_i64("FITTUNE_PHOTO_UPLOAD_CONCURRENCY", "1")?;
+                if limit > 4 {
+                    bail!("FITTUNE_PHOTO_UPLOAD_CONCURRENCY must be between 1 and 4");
+                }
+                limit as usize
+            },
             registration,
             client_ip_header,
         })
@@ -136,11 +148,38 @@ fn var_or(key: &str, default: &str) -> String {
         .unwrap_or_else(|| default.to_owned())
 }
 
-fn parse_origins(raw: &str) -> Vec<String> {
+fn positive_i64(key: &str, default: &str) -> Result<i64> {
+    let value: i64 = var_or(key, default)
+        .parse()
+        .with_context(|| format!("{key} must be a positive integer"))?;
+    if value <= 0 {
+        bail!("{key} must be greater than zero");
+    }
+    Ok(value)
+}
+
+fn parse_origins(raw: &str) -> Result<Vec<String>> {
     raw.split(',')
         .map(|origin| origin.trim().trim_end_matches('/'))
         .filter(|origin| !origin.is_empty())
-        .map(str::to_owned)
+        .map(|origin| {
+            HeaderValue::from_str(origin)
+                .context("FITTUNE_CORS_ORIGINS contains an invalid header value")?;
+            let uri: Uri = origin
+                .parse()
+                .context("FITTUNE_CORS_ORIGINS contains an invalid origin")?;
+            if !matches!(uri.scheme_str(), Some("http" | "https"))
+                || uri.authority().is_none()
+                || uri.path() != "/" && !uri.path().is_empty()
+                || uri.query().is_some()
+                || uri
+                    .authority()
+                    .is_some_and(|authority| authority.as_str().contains('@'))
+            {
+                bail!("FITTUNE_CORS_ORIGINS must contain only HTTP or HTTPS origins");
+            }
+            Ok(origin.to_owned())
+        })
         .collect()
 }
 
@@ -151,8 +190,23 @@ mod tests {
     #[test]
     fn parses_comma_separated_origins() {
         assert_eq!(
-            parse_origins(" https://a.example/ , ,http://localhost:5173"),
+            parse_origins(" https://a.example/ , ,http://localhost:5173").expect("valid origins"),
             vec!["https://a.example", "http://localhost:5173"]
         );
+    }
+
+    #[test]
+    fn rejects_invalid_cors_origins_instead_of_dropping_them() {
+        for origin in [
+            "https://a.example\ninvalid",
+            "*",
+            "null",
+            "ftp://a.example",
+            "https://a.example/path",
+            "https://a.example?query=1",
+            "https://user@a.example",
+        ] {
+            assert!(parse_origins(origin).is_err(), "accepted {origin:?}");
+        }
     }
 }

@@ -1,11 +1,17 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use anyhow::Result;
 use async_trait::async_trait;
-use axum::http::{Method, StatusCode, header};
+use axum::{
+    body::Body,
+    http::{Method, StatusCode, header},
+};
 use fittune_api::photos::PhotoStore;
 use image::{DynamicImage, ImageFormat};
 use serde_json::Value;
@@ -17,7 +23,7 @@ use crate::{
 };
 
 #[derive(Default)]
-pub struct MemoryPhotos(pub Mutex<HashMap<String, Vec<u8>>>);
+pub struct MemoryPhotos(pub Mutex<HashMap<String, Vec<u8>>>, pub AtomicUsize);
 
 #[async_trait]
 impl PhotoStore for MemoryPhotos {
@@ -26,15 +32,17 @@ impl PhotoStore for MemoryPhotos {
         Ok(())
     }
     async fn exists(&self, key: &str) -> Result<bool> {
+        self.1.fetch_add(1, Ordering::SeqCst);
         Ok(self.0.lock().expect("lock").contains_key(key))
     }
-    async fn get(&self, key: &str) -> Result<Vec<u8>> {
-        self.0
+    async fn get(&self, key: &str) -> Result<Option<Body>> {
+        Ok(self
+            .0
             .lock()
             .expect("lock")
             .get(key)
             .cloned()
-            .ok_or_else(|| anyhow::anyhow!("missing object"))
+            .map(Body::from))
     }
     async fn delete(&self, key: &str) -> Result<()> {
         self.0.lock().expect("lock").remove(key);
@@ -42,7 +50,7 @@ impl PhotoStore for MemoryPhotos {
     }
 }
 
-fn png() -> Vec<u8> {
+pub(super) fn png() -> Vec<u8> {
     let mut bytes = std::io::Cursor::new(Vec::new());
     DynamicImage::new_rgb8(8, 8)
         .write_to(&mut bytes, ImageFormat::Png)
@@ -279,4 +287,19 @@ async fn upload_with_an_id_owned_by_another_user_is_a_conflict(pool: PgPool) {
         .await;
     assert_eq!(status, StatusCode::CONFLICT);
     assert_eq!(memory.0.lock().expect("lock").len(), stored);
+}
+
+pub(super) async fn upload_photo(app: &TestApp, token: &str, id: &str) -> StatusCode {
+    let mut body = b"--test-boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"photo.png\"\r\nContent-Type: image/png\r\n\r\n".to_vec();
+    body.extend_from_slice(&png());
+    body.extend_from_slice(b"\r\n--test-boundary--\r\n");
+    app.raw(
+        Method::PUT,
+        &format!("/api/v1/train/progress-photos/{id}"),
+        Some(token),
+        Some("multipart/form-data; boundary=test-boundary"),
+        body,
+    )
+    .await
+    .0
 }

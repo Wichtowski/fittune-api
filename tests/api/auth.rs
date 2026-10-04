@@ -359,12 +359,144 @@ async fn health_reports_database_status(pool: PgPool) {
     let app = TestApp::new(pool);
     let (status, body) = app.request(Method::GET, "/health", None, None).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(
-        body,
-        json!({ "status": "ok", "version": "test", "database": "ok" })
-    );
+    assert_eq!(body, json!({ "status": "ok", "database": "ok" }));
 
     let (status, body) = app.request(Method::GET, "/api/v1/nope", None, None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert_eq!(body["code"], "not_found");
+}
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn concurrent_login_attempts_cannot_overshoot_the_limit(pool: PgPool) {
+    let app = std::sync::Arc::new(TestApp::new(pool));
+    app.register("burstlogin").await;
+    let mut tasks = tokio::task::JoinSet::new();
+    for _ in 0..12 {
+        let app = app.clone();
+        tasks.spawn(async move {
+            app.post(
+                "/api/v1/auth/login",
+                None,
+                json!({ "login": "burstlogin", "password": "Wrong#Pass1" }),
+            )
+            .await
+            .0
+        });
+    }
+    let mut admitted = 0;
+    let mut limited = 0;
+    while let Some(result) = tasks.join_next().await {
+        match result.expect("request task") {
+            StatusCode::UNAUTHORIZED => admitted += 1,
+            StatusCode::TOO_MANY_REQUESTS => limited += 1,
+            status => panic!("unexpected status: {status}"),
+        }
+    }
+    assert_eq!((admitted, limited), (10, 2));
+}
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn configured_proxy_header_is_required_and_must_be_an_ip(pool: PgPool) {
+    let app = TestApp::new(pool);
+    for ip in [
+        None,
+        Some("spoofed-client"),
+        Some("198.51.100.1, 203.0.113.2"),
+    ] {
+        let (status, _) = app
+            .request_from(
+                ip,
+                Method::POST,
+                "/api/v1/auth/login",
+                None,
+                Some(json!({ "login": "nobody", "password": PASSWORD })),
+            )
+            .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+}
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn concurrent_password_confirmations_cannot_overshoot_the_limit(pool: PgPool) {
+    let app = std::sync::Arc::new(TestApp::new(pool));
+    let user = app.register("burstpassword").await;
+    let mut tasks = tokio::task::JoinSet::new();
+    for _ in 0..12 {
+        let app = app.clone();
+        let token = user.token.clone();
+        tasks.spawn(async move {
+            app.post(
+                "/api/v1/me/password",
+                Some(&token),
+                json!({ "current_password": "Wrong#Pass1", "new_password": "New#Password9" }),
+            )
+            .await
+            .0
+        });
+    }
+    let mut admitted = 0;
+    let mut limited = 0;
+    while let Some(result) = tasks.join_next().await {
+        match result.expect("request task") {
+            StatusCode::UNPROCESSABLE_ENTITY => admitted += 1,
+            StatusCode::TOO_MANY_REQUESTS => limited += 1,
+            status => panic!("unexpected status: {status}"),
+        }
+    }
+    assert_eq!((admitted, limited), (10, 2));
+}
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn registration_limiter_stays_in_place_before_validation(pool: PgPool) {
+    let app = TestApp::new(pool);
+    for _ in 0..30 {
+        assert_eq!(
+            app.post("/api/v1/auth/register", None, json!({})).await.0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+    }
+    assert_eq!(
+        app.post("/api/v1/auth/register", None, json!({})).await.0,
+        StatusCode::TOO_MANY_REQUESTS
+    );
+}
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn verified_logins_do_not_use_up_the_failure_allowance(pool: PgPool) {
+    let app = TestApp::new(pool);
+    app.register("successbudget").await;
+    for _ in 0..12 {
+        assert_eq!(
+            app.post(
+                "/api/v1/auth/login",
+                None,
+                json!({"login": "successbudget", "password": PASSWORD})
+            )
+            .await
+            .0,
+            StatusCode::OK
+        );
+    }
+    for _ in 0..10 {
+        assert_eq!(
+            app.post(
+                "/api/v1/auth/login",
+                None,
+                json!({"login": "successbudget", "password": "Wrong#Pass1"})
+            )
+            .await
+            .0,
+            StatusCode::UNAUTHORIZED
+        );
+    }
+    assert_eq!(
+        app.post(
+            "/api/v1/auth/login",
+            None,
+            json!({"login": "successbudget", "password": "Wrong#Pass1"})
+        )
+        .await
+        .0,
+        StatusCode::TOO_MANY_REQUESTS
+    );
 }
