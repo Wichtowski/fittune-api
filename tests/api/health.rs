@@ -16,7 +16,7 @@ fn oats() -> Value {
             "energy_kcal": 372.0, "protein_g": 13.0, "fat_g": 7.0, "carbs_g": 60.0,
             "saturated_fat_g": 1.2, "sugars_g": 1.0, "fiber_g": 10.0, "salt_g": 0.01
         },
-        "serving_g": 40.0,
+        "serving_amount": 40.0,
         "serving_name": "4 tablespoons"
     })
 }
@@ -175,16 +175,17 @@ async fn entries_snapshot_the_product_and_stay_private(pool: PgPool) {
     let breakfast = meals(&app, &user).await[0].clone();
 
     let uri = format!("/api/v1/health/entries/{}", uuid());
-    let body = json!({ "date": "2026-09-29", "meal_id": id(&breakfast), "product_id": id(&product), "grams": 50.0 });
+    let body = json!({ "date": "2026-09-29", "meal_id": id(&breakfast), "product_id": id(&product), "amount": 50.0 });
     let (status, entry) = app.put(&uri, &user.token, body.clone()).await;
     assert_eq!(status, StatusCode::CREATED, "{entry}");
     assert_eq!(entry["product_name"], "Oat flakes");
+    assert_eq!(entry["unit"], "g");
 
     let mut more = body.clone();
-    more["grams"] = json!(80.0);
+    more["amount"] = json!(80.0);
     let (status, entry) = app.put(&uri, &user.token, more).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(entry["grams"], 80.0);
+    assert_eq!(entry["amount"], 80.0);
 
     // Editing the shared product does not rewrite the entry
     let mut changed = oats();
@@ -220,7 +221,7 @@ async fn entries_snapshot_the_product_and_stay_private(pool: PgPool) {
         .await;
     assert_eq!(their_day["totals"]["energy_kcal"], 0.0);
 
-    let missing = json!({ "date": "2026-09-29", "meal_id": id(&breakfast), "product_id": uuid(), "grams": 50.0 });
+    let missing = json!({ "date": "2026-09-29", "meal_id": id(&breakfast), "product_id": uuid(), "amount": 50.0 });
     let (status, _) = app
         .put(
             &format!("/api/v1/health/entries/{}", uuid()),
@@ -255,7 +256,7 @@ async fn search_puts_the_callers_recent_products_first(pool: PgPool) {
     assert_eq!(before["products"][0]["name"], "Almond milk");
 
     let meal = meals(&app, &user).await[0].clone();
-    let body = json!({ "date": "2026-09-29", "meal_id": id(&meal), "product_id": id(&milk), "grams": 200.0 });
+    let body = json!({ "date": "2026-09-29", "meal_id": id(&meal), "product_id": id(&milk), "amount": 200.0 });
     app.put(
         &format!("/api/v1/health/entries/{}", uuid()),
         &user.token,
@@ -466,7 +467,7 @@ async fn deleting_an_account_removes_its_diary_but_keeps_shared_products(pool: P
     let stayer = app.register("stayer").await;
     let product = create_product(&app, &user, oats()).await;
     let meal = meals(&app, &user).await[0].clone();
-    let body = json!({ "date": "2026-09-29", "meal_id": id(&meal), "product_id": id(&product), "grams": 50.0 });
+    let body = json!({ "date": "2026-09-29", "meal_id": id(&meal), "product_id": id(&product), "amount": 50.0 });
     app.put(
         &format!("/api/v1/health/entries/{}", uuid()),
         &user.token,
@@ -498,4 +499,45 @@ async fn deleting_an_account_removes_its_diary_but_keeps_shared_products(pool: P
         .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(kept["name"], "Oat flakes");
+}
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn drinks_are_logged_in_millilitres(pool: PgPool) {
+    let app = TestApp::new(pool);
+    let user = app.register("drinker").await;
+    let mut juice = oats();
+    juice["name"] = json!("Orange juice");
+    juice["unit"] = json!("ml");
+    juice["serving_amount"] = json!(250.0);
+    juice["per_100g"] =
+        json!({ "energy_kcal": 45.0, "protein_g": 0.7, "fat_g": 0.2, "carbs_g": 10.0 });
+    let juice = create_product(&app, &user, juice).await;
+    assert_eq!(juice["unit"], "ml");
+
+    let meal = meals(&app, &user).await[0].clone();
+    let body = json!({ "date": "2026-09-29", "meal_id": id(&meal), "product_id": id(&juice), "amount": 250.0 });
+    let (status, entry) = app
+        .put(
+            &format!("/api/v1/health/entries/{}", uuid()),
+            &user.token,
+            body,
+        )
+        .await;
+    assert_eq!(status, StatusCode::CREATED, "{entry}");
+    assert_eq!(
+        (entry["unit"].clone(), entry["amount"].clone()),
+        (json!("ml"), json!(250.0))
+    );
+
+    let (_, day) = app
+        .get("/api/v1/health/days/2026-09-29?tz=UTC", &user.token)
+        .await;
+    assert!((day["totals"]["energy_kcal"].as_f64().expect("number") - 112.5).abs() < 0.01);
+
+    let mut bad = oats();
+    bad["unit"] = json!("litres");
+    let (status, _) = app
+        .post("/api/v1/health/products", Some(&user.token), bad)
+        .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
 }
