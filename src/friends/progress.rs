@@ -17,6 +17,7 @@ use crate::{
     error::ApiResult,
     extract::{Path, Query},
     pagination::{self, Page},
+    photos::{self, FileQuery},
     stats::{
         self,
         model::{ExerciseRecord, Overview, PeriodQuery},
@@ -30,7 +31,7 @@ pub struct FeedQuery {
     limit: Option<i64>,
 }
 
-/// Recent finished workouts and activities of every friend who shares them
+/// Recent finished workouts, activities and progress photos of every friend who shares them
 pub async fn feed(
     State(state): State<AppState>,
     auth: Auth,
@@ -67,6 +68,7 @@ async fn load_feed(
     };
     let workout_owners = sharing(Resource::Workouts);
     let activity_owners = sharing(Resource::Activities);
+    let photo_owners = sharing(Resource::Photos);
 
     // Each source is fetched one past the page, so their merge holds every row the page needs
     let mut items: Vec<(Uuid, FeedItem)> = Vec::new();
@@ -88,6 +90,13 @@ async fn load_feed(
         items.extend(
             rows.into_iter()
                 .map(|a| (a.user_id, FeedItem::Activity(a.into()))),
+        );
+    }
+    if !photo_owners.is_empty() {
+        let rows = photos::list_for_owners(&state.db, &photo_owners, before, limit + 1).await?;
+        items.extend(
+            rows.into_iter()
+                .map(|(owner, p)| (owner, FeedItem::Photo(p.into()))),
         );
     }
     items.sort_by_key(|(_, item)| std::cmp::Reverse(item.key()));
@@ -143,4 +152,15 @@ pub async fn records(
     )
     .await?;
     Ok(axum::Json(stats::repo::records(&state.db, user_id).await?))
+}
+
+/// A friend's progress photo as JPEG, only while they share photos
+pub async fn photo_file(
+    State(state): State<AppState>,
+    auth: Auth,
+    Path((user_id, photo_id)): Path<(Uuid, Uuid)>,
+    Query(query): Query<FileQuery>,
+) -> ApiResult<axum::response::Response> {
+    access::can_view(&state.db, auth.user_id(), user_id, Resource::Photos).await?;
+    photos::serve_file(&state, user_id, photo_id, &query).await
 }

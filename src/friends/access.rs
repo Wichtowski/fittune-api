@@ -16,7 +16,8 @@ pub async fn friends(db: &PgPool, viewer: Uuid, only: Option<Uuid>) -> sqlx::Res
                 COALESCE(s.workouts, false) AS workouts,
                 COALESCE(s.activities, false) AS activities,
                 COALESCE(s.stats, false) AS stats,
-                COALESCE(s.personal_records, false) AS personal_records
+                COALESCE(s.personal_records, false) AS personal_records,
+                COALESCE(s.photos, false) AS photos
          FROM friendships f
          JOIN users u ON u.id = CASE WHEN f.requester_id = $1 THEN f.addressee_id ELSE f.requester_id END
          LEFT JOIN friend_sharing s ON s.user_id = u.id

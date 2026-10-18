@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{activities::model::Activity, workouts::model::WorkoutSummary};
+use crate::{activities::model::Activity, photos::ProgressPhoto, workouts::model::WorkoutSummary};
 
 /// The only profile fields other users ever see
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
@@ -20,6 +20,9 @@ pub struct Sharing {
     pub activities: bool,
     pub stats: bool,
     pub personal_records: bool,
+    /// Optional in requests, so a client that predates the field turns it off rather than failing
+    #[serde(default)]
+    pub photos: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,6 +31,7 @@ pub enum Resource {
     Activities,
     Stats,
     PersonalRecords,
+    Photos,
 }
 
 impl Sharing {
@@ -37,6 +41,7 @@ impl Sharing {
             Resource::Activities => self.activities,
             Resource::Stats => self.stats,
             Resource::PersonalRecords => self.personal_records,
+            Resource::Photos => self.photos,
         }
     }
 }
@@ -149,11 +154,32 @@ impl From<Activity> for FriendActivity {
     }
 }
 
+/// A progress photo as friends see it: no workout link or storage details
+#[derive(Debug, Serialize)]
+pub struct FriendPhoto {
+    pub id: Uuid,
+    pub taken_at: DateTime<Utc>,
+    pub width: i32,
+    pub height: i32,
+}
+
+impl From<ProgressPhoto> for FriendPhoto {
+    fn from(p: ProgressPhoto) -> Self {
+        Self {
+            id: p.id,
+            taken_at: p.taken_at,
+            width: p.width,
+            height: p.height,
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum FeedItem {
     Workout(FriendWorkout),
     Activity(FriendActivity),
+    Photo(FriendPhoto),
 }
 
 impl FeedItem {
@@ -161,6 +187,7 @@ impl FeedItem {
         match self {
             Self::Workout(w) => (w.started_at, w.id),
             Self::Activity(a) => (a.started_at, a.id),
+            Self::Photo(p) => (p.taken_at, p.id),
         }
     }
 }
@@ -184,6 +211,7 @@ mod tests {
             Resource::Activities,
             Resource::Stats,
             Resource::PersonalRecords,
+            Resource::Photos,
         ] {
             assert!(!sharing.allows(resource));
         }
@@ -191,7 +219,14 @@ mod tests {
 
     #[test]
     fn sharing_rejects_unknown_fields() {
-        let json = r#"{"workouts":true,"activities":false,"stats":false,"personal_records":false,"photos":true}"#;
+        let json = r#"{"workouts":true,"activities":false,"stats":false,"personal_records":false,"progress_photos":true}"#;
         assert!(serde_json::from_str::<Sharing>(json).is_err());
+    }
+
+    #[test]
+    fn sharing_without_photos_keeps_them_private() {
+        let json = r#"{"workouts":true,"activities":true,"stats":true,"personal_records":true}"#;
+        let sharing: Sharing = serde_json::from_str(json).expect("older clients omit photos");
+        assert!(!sharing.allows(Resource::Photos));
     }
 }

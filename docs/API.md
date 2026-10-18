@@ -390,14 +390,15 @@ Lookups and friend requests share a limit of 300 per user per hour (`429 rate_li
 
 ```json
 Friend { "user": PublicUser, "since": "…",
-         "sharing": { "workouts": true, "activities": false, "stats": true, "personal_records": false } }
+         "sharing": { "workouts": true, "activities": false, "stats": true, "personal_records": false,
+                     "photos": false } }
 FriendRequest { "user": PublicUser, "created_at": "…" }
 ```
 
 ### Sharing and progress
 
 Nothing is shared until the user opts in.
-Progress photos are never visible to friends.
+Progress photos are visible to friends only with `photos`; `PUT /me/sharing` treats a missing `photos` as `false`.
 Friend endpoints answer `404` for anyone who is not a friend and `403` when the friend does not share that resource.
 
 | Method | Path | Response |
@@ -409,8 +410,9 @@ Friend endpoints answer `404` for anyone who is not a friend and `403` when the 
 | GET | `/api/v1/friends/{user_id}/feed?limit&cursor` | `Page<FeedEntry>` of that friend |
 | GET | `/api/v1/friends/{user_id}/stats/overview?from&to&tz` | same as `/stats/overview`; needs `stats` |
 | GET | `/api/v1/friends/{user_id}/records` | same as `/stats/records`; needs `personal_records` |
+| GET | `/api/v1/friends/{user_id}/photos/{photo_id}/file?size=full\|thumb` | JPEG image, `Cache-Control: private, no-store`; needs `photos` |
 
-Feed entries are finished workouts and activities, newest first, without notes, place, routine or health data.
+Feed entries are finished workouts, activities and progress photos, newest first (photos by `taken_at`), without notes, place, routine, health data or a photo's workout link.
 
 ```json
 FeedEntry { "user": PublicUser, "type": "workout", "id": "uuid", "title": "Push Day", "started_at": "…",
@@ -418,6 +420,7 @@ FeedEntry { "user": PublicUser, "type": "workout", "id": "uuid", "title": "Push 
             "total_reps": 10, "volume_kg": 1000.0, "exercise_names": ["Barbell Bench Press"] }
 FeedEntry { "user": PublicUser, "type": "activity", "id": "uuid", "kind": "run", "title": "Easy run",
             "started_at": "…", "duration_seconds": 1800, "distance_m": 5000.0, "elevation_gain_m": null }
+FeedEntry { "user": PublicUser, "type": "photo", "id": "uuid", "taken_at": "…", "width": 1536, "height": 2048 }
 ```
 
 ## Changes from the legacy Node API

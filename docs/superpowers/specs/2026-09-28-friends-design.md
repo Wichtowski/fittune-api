@@ -22,11 +22,11 @@ Migration `20260928000005_friends.sql`:
   - Declining, cancelling and removing delete the row
 - `user_blocks (blocker_id, blocked_id, created_at)`
   - One row per direction, so each side can block and unblock independently
-- `friend_sharing (user_id, workouts, activities, stats, personal_records, updated_at)`
+- `friend_sharing (user_id, workouts, activities, stats, personal_records, photos, updated_at)`
   - A missing row means everything is private
 - All three cascade on user deletion
 
-Progress photos are never visible to friends.
+Progress photos are visible to friends only when the owner turns on `photos` (added 2026-10-18, off by default).
 Measurements do not exist yet, so there is nothing to share.
 
 ## Rules
@@ -37,6 +37,7 @@ Measurements do not exist yet, so there is nothing to share.
 - Friends only see `{ id, username, display_name }` of each other, never email, birthday or role
 - Workouts are shown as summaries without place, routine or notes
 - Activities are shown without notes, heart rate, calories and perceived effort
+- Photos are shown as `{ id, taken_at, width, height }` without their workout link; files are served through `/friends/{user_id}/photos/{photo_id}/file` after the same access check
 - Only finished workouts are visible
 
 ## Concurrency

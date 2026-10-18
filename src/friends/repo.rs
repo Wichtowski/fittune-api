@@ -200,7 +200,7 @@ pub async fn outgoing(db: &PgPool, user_id: Uuid) -> sqlx::Result<Vec<FriendRequ
 
 pub async fn sharing(db: &PgPool, user_id: Uuid) -> sqlx::Result<Sharing> {
     let sharing: Option<Sharing> = sqlx::query_as(
-        "SELECT workouts, activities, stats, personal_records FROM friend_sharing WHERE user_id = $1",
+        "SELECT workouts, activities, stats, personal_records, photos FROM friend_sharing WHERE user_id = $1",
     )
     .bind(user_id)
     .fetch_optional(db)
@@ -210,21 +210,23 @@ pub async fn sharing(db: &PgPool, user_id: Uuid) -> sqlx::Result<Sharing> {
 
 pub async fn set_sharing(db: &PgPool, user_id: Uuid, sharing: Sharing) -> sqlx::Result<Sharing> {
     sqlx::query_as(
-        "INSERT INTO friend_sharing (user_id, workouts, activities, stats, personal_records)
-         VALUES ($1, $2, $3, $4, $5)
+        "INSERT INTO friend_sharing (user_id, workouts, activities, stats, personal_records, photos)
+         VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (user_id) DO UPDATE SET
             workouts = EXCLUDED.workouts,
             activities = EXCLUDED.activities,
             stats = EXCLUDED.stats,
             personal_records = EXCLUDED.personal_records,
+            photos = EXCLUDED.photos,
             updated_at = now()
-         RETURNING workouts, activities, stats, personal_records",
+         RETURNING workouts, activities, stats, personal_records, photos",
     )
     .bind(user_id)
     .bind(sharing.workouts)
     .bind(sharing.activities)
     .bind(sharing.stats)
     .bind(sharing.personal_records)
+    .bind(sharing.photos)
     .fetch_one(db)
     .await
 }

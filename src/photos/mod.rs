@@ -11,7 +11,7 @@ use axum::{
     body::Bytes,
     extract::{DefaultBodyLimit, Multipart, Path, Query, State},
     http::{StatusCode, header},
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::get,
 };
 use chrono::{DateTime, Utc};
@@ -20,6 +20,7 @@ use image::{
     imageops::FilterType,
 };
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
@@ -352,7 +353,7 @@ async fn find(state: &AppState, user_id: Uuid, id: Uuid) -> ApiResult<Option<Sto
 }
 
 #[derive(Deserialize)]
-struct FileQuery {
+pub struct FileQuery {
     size: Option<String>,
 }
 
@@ -361,8 +362,18 @@ async fn file(
     auth: Auth,
     Path(id): Path<Uuid>,
     Query(query): Query<FileQuery>,
-) -> ApiResult<impl IntoResponse> {
-    let photo = find(&state, auth.user_id(), id)
+) -> ApiResult<Response> {
+    serve_file(&state, auth.user_id(), id, &query).await
+}
+
+/// The JPEG of `owner`'s photo `id`. Callers decide whether the viewer may see `owner`'s photos
+pub async fn serve_file(
+    state: &AppState,
+    owner: Uuid,
+    id: Uuid,
+    query: &FileQuery,
+) -> ApiResult<Response> {
+    let photo = find(state, owner, id)
         .await?
         .ok_or(ApiError::NotFound("photo"))?;
     let suffix = match query.size.as_deref() {
@@ -370,7 +381,7 @@ async fn file(
         Some("thumb") => "thumb",
         _ => return Err(ApiError::BadRequest("Unknown image size".into())),
     };
-    let bytes = store(&state)?
+    let bytes = store(state)?
         .get(&format!("{}/{suffix}.jpg", photo.storage_key))
         .await
         .map_err(ApiError::Internal)?
@@ -381,7 +392,43 @@ async fn file(
             (header::CACHE_CONTROL, "private, no-store"),
         ],
         bytes,
-    ))
+    )
+        .into_response())
+}
+
+#[derive(sqlx::FromRow)]
+struct OwnedPhoto {
+    user_id: Uuid,
+    #[sqlx(flatten)]
+    photo: ProgressPhoto,
+}
+
+/// Photos of every user in `owners`, newest first, keyset-paged on `(taken_at, id)`
+pub async fn list_for_owners(
+    db: &PgPool,
+    owners: &[Uuid],
+    before: Option<(DateTime<Utc>, Uuid)>,
+    limit: i64,
+) -> sqlx::Result<Vec<(Uuid, ProgressPhoto)>> {
+    let (before_at, before_id) = before.unzip();
+    let rows: Vec<OwnedPhoto> = sqlx::query_as(
+        "SELECT user_id, id, workout_id, width, height, bytes, taken_at, created_at
+         FROM progress_photos
+         WHERE user_id = ANY($1)
+           AND ($2::timestamptz IS NULL OR (taken_at, id) < ($2, $3))
+         ORDER BY taken_at DESC, id DESC
+         LIMIT $4",
+    )
+    .bind(owners)
+    .bind(before_at)
+    .bind(before_id)
+    .bind(limit)
+    .fetch_all(db)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| (row.user_id, row.photo))
+        .collect())
 }
 
 async fn delete(

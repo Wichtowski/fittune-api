@@ -35,6 +35,10 @@ pub fn router() -> Router<AppState> {
         .route("/friends/{user_id}/feed", get(progress::friend_feed))
         .route("/friends/{user_id}/stats/overview", get(progress::overview))
         .route("/friends/{user_id}/records", get(progress::records))
+        .route(
+            "/friends/{user_id}/photos/{photo_id}/file",
+            get(progress::photo_file),
+        )
         .route("/blocks", get(blocks))
         .route("/blocks/{user_id}", put(block).delete(unblock))
 }

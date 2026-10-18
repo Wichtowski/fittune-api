@@ -1,10 +1,13 @@
-use axum::http::{Method, StatusCode};
+use std::sync::Arc;
+
+use axum::http::{Method, StatusCode, header};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
 use crate::{
     activities::run,
     common::{PASSWORD, TestApp, TestUser, uuid},
+    photos::{MemoryPhotos, png},
     workouts::workout,
 };
 
@@ -16,7 +19,13 @@ fn sharing(workouts: bool, activities: bool, stats: bool, personal_records: bool
         "activities": activities,
         "stats": stats,
         "personal_records": personal_records,
+        "photos": false,
     })
+}
+
+fn with_photos(mut settings: Value) -> Value {
+    settings["photos"] = json!(true);
+    settings
 }
 
 /// Sends `from` → `to` and accepts it, leaving them friends
@@ -627,4 +636,142 @@ async fn sharing_settings_default_to_private_and_reject_unknown_fields(pool: PgP
     share(&app, &alice, sharing(true, false, true, false)).await;
     let (_, settings) = app.get("/api/v1/me/sharing", &alice.token).await;
     assert_eq!(settings, sharing(true, false, true, false));
+}
+
+/// Uploads a progress photo without a workout and returns its id
+async fn upload_photo(app: &TestApp, user: &TestUser) -> String {
+    let id = uuid();
+    let mut body = b"--test-boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"photo.png\"\r\nContent-Type: image/png\r\n\r\n".to_vec();
+    body.extend_from_slice(&png());
+    body.extend_from_slice(b"\r\n--test-boundary--\r\n");
+    let (status, _, bytes) = app
+        .raw(
+            Method::PUT,
+            &format!("/api/v1/train/progress-photos/{id}"),
+            Some(&user.token),
+            Some("multipart/form-data; boundary=test-boundary"),
+            body,
+        )
+        .await;
+    assert_eq!(
+        status,
+        StatusCode::CREATED,
+        "{}",
+        String::from_utf8_lossy(&bytes)
+    );
+    id
+}
+
+#[sqlx::test(migrator = "fittune_api::db::MIGRATOR")]
+async fn photos_are_shared_only_when_opted_in(pool: PgPool) {
+    let app = TestApp::with_photos(pool, Some(Arc::new(MemoryPhotos::default())));
+    let alice = app.register("alice").await;
+    let bobby = app.register("bobby").await;
+    let carol = app.register("carol").await;
+    befriend(&app, &alice, &bobby, "bobby").await;
+    let photo = upload_photo(&app, &bobby).await;
+    let alices_own = upload_photo(&app, &alice).await;
+    let file = |owner: &TestUser, id: &str| {
+        format!("/api/v1/friends/{}/photos/{id}/file?size=thumb", owner.id)
+    };
+
+    // Everything else shared, photos still private
+    share(&app, &bobby, EVERYTHING).await;
+    let (_, feed) = app.get("/api/v1/friends/feed", &alice.token).await;
+    assert!(!feed_types(&feed).contains(&"photo"), "{feed}");
+    let (status, _, _) = app
+        .raw(
+            Method::GET,
+            &file(&bobby, &photo),
+            Some(&alice.token),
+            None,
+            vec![],
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    share(
+        &app,
+        &bobby,
+        with_photos(sharing(false, false, false, false)),
+    )
+    .await;
+    let (_, profile) = app
+        .get(&format!("/api/v1/friends/{}", bobby.id), &alice.token)
+        .await;
+    assert_eq!(profile["sharing"]["photos"], true);
+    let (_, feed) = app.get("/api/v1/friends/feed", &alice.token).await;
+    assert_eq!(feed_types(&feed), ["photo"]);
+    let item = &feed["items"][0];
+    assert_eq!(item["id"], photo.as_str());
+    assert_eq!(item["user"]["username"], "bobby");
+    for private in ["workout_id", "storage_key", "bytes"] {
+        assert!(item.get(private).is_none(), "{private} leaked: {item}");
+    }
+
+    let (status, headers, image) = app
+        .raw(
+            Method::GET,
+            &file(&bobby, &photo),
+            Some(&alice.token),
+            None,
+            vec![],
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        headers.get(header::CONTENT_TYPE).expect("content type"),
+        "image/jpeg"
+    );
+    assert!(image.starts_with(&[0xff, 0xd8]));
+
+    // A photo id of someone else cannot be read through a sharing friend
+    let (status, _, _) = app
+        .raw(
+            Method::GET,
+            &file(&bobby, &alices_own),
+            Some(&alice.token),
+            None,
+            vec![],
+        )
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    // Strangers see nothing
+    let (status, _, _) = app
+        .raw(
+            Method::GET,
+            &file(&bobby, &photo),
+            Some(&carol.token),
+            None,
+            vec![],
+        )
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    // Sharing is one-way
+    let (status, _, _) = app
+        .raw(
+            Method::GET,
+            &file(&alice, &alices_own),
+            Some(&bobby.token),
+            None,
+            vec![],
+        )
+        .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    // Removing the friend revokes access immediately
+    let (status, _) = app
+        .delete(&format!("/api/v1/friends/{}", bobby.id), &alice.token)
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, _, _) = app
+        .raw(
+            Method::GET,
+            &file(&bobby, &photo),
+            Some(&alice.token),
+            None,
+            vec![],
+        )
+        .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
 }
