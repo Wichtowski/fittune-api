@@ -148,5 +148,18 @@ jobs:
             docker compose --env-file .env -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 180
             docker compose --env-file .env -f docker-compose.prod.yml ps
 
+            # Keep the deployed API and OCR images plus the two newest earlier releases for rollback;
+            # older tags can still be pulled from GHCR
+            for repo in "${IMAGE}" "${OCR_IMAGE}"; do
+              docker image ls "${repo}" --format '{{.Tag}}' \
+                | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+                | grep -vxF "${RELEASE_VERSION}" \
+                | sort -V \
+                | head -n -2 \
+                | while read -r old_tag; do
+                    docker image rm "${repo}:${old_tag}" || true
+                  done || true
+            done
+
             # Drop untagged layers of superseded releases
             docker image prune -f
