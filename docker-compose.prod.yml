@@ -1,5 +1,9 @@
+# Fixed project name, so containers, volumes and networks are fittune_* whatever the deploy directory is called
+name: fittune
+
 services:
   fittune-postgres:
+    container_name: fittune-postgres
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -26,6 +30,7 @@ services:
         max-file: "3"
 
   fittune-api:
+    container_name: fittune-api
     # Built and pushed by the deploy workflow; FITTUNE_APP_VERSION is the release tag
     image: ghcr.io/wichtowski/fittune-api:${FITTUNE_APP_VERSION:?Set FITTUNE_APP_VERSION to the release tag}
     restart: unless-stopped
@@ -70,6 +75,7 @@ services:
         max-file: "3"
 
   fittune-ocr:
+    container_name: fittune-ocr
     image: ghcr.io/wichtowski/fittune-ocr:${FITTUNE_APP_VERSION:?Set FITTUNE_APP_VERSION to the release tag}
     restart: unless-stopped
     expose:
@@ -99,6 +105,7 @@ services:
         max-file: "3"
 
   fittune-rustfs:
+    container_name: fittune-rustfs
     image: rustfs/rustfs:1.0.0-rc.6
     restart: unless-stopped
     environment:
@@ -124,6 +131,7 @@ services:
         max-file: "3"
 
   fittune-photos-bucket:
+    container_name: fittune-photos-bucket
     image: rustfs/rc:latest
     depends_on:
       fittune-rustfs:
