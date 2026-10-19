@@ -143,10 +143,38 @@ jobs:
             mv "${RELEASE_DIR}/.env.production" .env
             chmod 600 .env
 
+            # One-time move from the legacy "api" compose project (named after the deploy directory)
+            # to "fittune". The api_* volumes are left in place as a backup.
+            if docker volume inspect api_pgdata >/dev/null 2>&1 && ! docker volume inspect fittune_pgdata >/dev/null 2>&1; then
+              # Stop cleanly before copying, so Postgres is not copied while running
+              legacy_containers=$(docker ps -aq --filter label=com.docker.compose.project=api)
+              if [ -n "${legacy_containers}" ]; then
+                docker stop -t 30 ${legacy_containers}
+                docker rm ${legacy_containers}
+              fi
+              docker network rm api_data_net >/dev/null 2>&1 || true
+              for volume in pgdata rustfsdata; do
+                docker volume create --label com.docker.compose.project=fittune --label com.docker.compose.volume="${volume}" "fittune_${volume}"
+                docker run --rm -v "api_${volume}:/from:ro" -v "fittune_${volume}:/to" postgres:16-alpine cp -a /from/. /to/
+              done
+            fi
+
             # Recreates only what changed; named volumes (Postgres, RustFS) are kept.
             # Migrations run on API start-up.
             docker compose --env-file .env -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 180
             docker compose --env-file .env -f docker-compose.prod.yml ps
+
+            # Keep the deployed release plus the two newest older ones for rollback
+            for repo in "${IMAGE}" "${OCR_IMAGE}"; do
+              docker image ls "${repo}" --format '{{.Tag}}' \
+                | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+                | grep -vxF "${RELEASE_VERSION}" \
+                | sort -V \
+                | head -n -2 \
+                | while read -r old_tag; do
+                    docker image rm "${repo}:${old_tag}" || true
+                  done || true
+            done
 
             # Drop untagged layers of superseded releases
             docker image prune -f
